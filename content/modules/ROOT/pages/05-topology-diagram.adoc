@@ -4,7 +4,7 @@ An interactive, clickable diagram of a multi-cluster {aigrid} deployment. Every 
 
 [NOTE]
 ====
-*Credit.* Diagram created by *Mario Vazquez*. The only change from his original is the datacenter name, now the fictional *Fed Aura Capital WONDR2 Datacenter*. Thanks Mario.
+*Credit.* Diagram created by *Mario Vazquez*. Thanks Mario.
 ====
 
 [subs="attributes"]
@@ -32,7 +32,7 @@ The diagram has four views, each answering a different architecture question.
 | Tab | What it answers
 
 | *Cluster's Location*
-| Where the clusters physically live. A cloud zone with an AWS `US-EAST` region and an Azure `US-WEST` region, each with an inference cluster, and an on-prem zone in the Fed Aura Capital WONDR2 Datacenter holding the hub cluster plus three GPU inference clusters (two NVIDIA L4 and one RTX 4000 PRO).
+| Where the clusters physically live. A cloud zone with an AWS `US-EAST` region and an Azure `US-WEST` region, each with an inference cluster, and an on-prem zone in the Fed Aura Capital Datacenter holding the hub cluster plus three GPU inference clusters (two NVIDIA L4 and one RTX 4000 PRO).
 
 | *Grid Architecture*
 | How the pieces connect. The control plane and inference entrypoint cluster, the Git repository that drives configuration, the inference clusters with the models each one serves, and two tenant clusters.
