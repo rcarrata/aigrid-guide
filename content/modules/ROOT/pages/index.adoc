@@ -1,0 +1,64 @@
+= AI Grid Guide
+
+Guide to understand {aigrid}: what it is, which components it is made of, and how an inference request travels across a multi-cluster grid.
+
+* Definition and scope of {aigrid}, with the personas that operate it
+* Architecture of the control plane and the data plane, and where the boundary sits
+* Component reference, including the custom resources that describe a grid
+* Request flow from the client to a model backend, across sites
+
+[IMPORTANT]
+====
+This guide is a community companion resource, not official {rhoai} documentation and not a replacement for it. The architecture described here is built from the public upstream project documentation (link:{upstream-grid}[Praxis Grid^] and link:{upstream-praxis}[Praxis^]) and from publicly shareable material.
+
+The guide deliberately contains *no roadmap, no release commitments and no forward-looking statements*. It describes how the architecture works, not what is planned next.
+====
+
+== What This Guide Covers Today
+
+This first iteration covers the architecture phase only. Installation, configuration and verification phases are not written yet.
+
+[cols="1,3", options="header"]
+|===
+| Page | Description
+
+| xref:01-what-is-ai-grid.adoc[What is AI Grid]
+| The definition, the problem it solves, who operates it, the end-to-end flow, and the tenancy model
+
+| xref:02-architecture.adoc[Architecture Overview]
+| Control plane versus data plane, the layered stack, hub and spoke, and the supported deployment topologies
+
+| xref:03-components.adoc[Components]
+| Every component and custom resource, the routing overlay lifecycle, and how candidates are scored
+
+| xref:04-request-flow.adoc[Request Flow]
+| Step by step path of an inference request, the two gateway pipelines, and the credential rules
+
+| xref:05-topology-diagram.adoc[Interactive Topology]
+| Clickable multi-cluster topology diagram, with cluster locations, grid architecture, tenant view and auth flow
+|===
+
+== Starting Point
+
+If you are new to {aigrid}, read the pages in order. The short version:
+
+{aigrid} turns several {ocp-short} clusters into a single governed model serving environment. A provider publishes models across those clusters, exposes them behind one gateway, and onboards customers as tenants through subscriptions. Tenant users call standard OpenAI compatible endpoints and never touch the underlying infrastructure.
+
+The architecture separates that into two halves, and most of this guide is about keeping them apart:
+
+[cols="1,3", options="header"]
+|===
+| Half | Responsibility
+
+| Control plane ({agn-short})
+| Decides *what should be routable*. Watches custom resources, learns remote site state, scores candidates, and publishes a routing overlay.
+
+| Data plane ({gateway})
+| Performs the *actual request routing*. Parses requests, selects a candidate from the overlay, authenticates peers, injects backend credentials, and proxies to the model.
+|===
+
+== References
+
+* link:{upstream-grid}[Praxis Grid - Architecture Overview^] (upstream of {aigrid})
+* link:{upstream-praxis}[Praxis - Architecture Overview^] (upstream proxy and filter runtime)
+* link:https://praxis.fast/[Praxis project documentation^], a CNCF Sandbox project under Apache 2.0

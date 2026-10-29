@@ -1,0 +1,321 @@
+= Architecture Overview
+
+This page explains how {aigrid} is put together: the boundary between the control plane and the data plane, the layers of the stack, and the deployment topologies you can choose.
+
+== The Boundary That Defines Everything
+
+{aigrid} splits responsibilities in a way that is simple to state and worth repeating often:
+
+[quote]
+____
+{agn-short} decides *what should be routable*. +
+{gateway} performs the *actual request routing*.
+____
+
+The control plane ({agn}, {agn-short}) watches Kubernetes resources, learns remote site state, scores candidates, and writes a local routing overlay. The gateway then uses that overlay on the request path.
+
+{agn-short} does *not* proxy HTTP traffic. It does not parse OpenAI requests, inject provider credentials, terminate data-plane TLS, or call model backends. Those jobs belong to the gateway and its proxy runtime.
+
+== Why a Control Plane Exists
+
+Without {agn-short}, every gateway would need static knowledge of every model backend, every remote cluster, every credential placement rule, every health signal and every routing fallback. That does not scale across multi-cluster and mixed-provider environments.
+
+So {agn-short} turns moving control-plane state into a local file the gateway can route from cheaply:
+
+----
+AGN resources + local health + remote SWIM/CRDT state
+  -> scored routing candidates
+  -> versioned routing overlay ConfigMap
+  -> AI Gateway validates and accepts a routing snapshot
+  -> intelligent_route serves requests from that snapshot
+----
+
+The consequence is the single most important performance and reliability property of the architecture:
+
+[IMPORTANT]
+====
+*The request hot path stays local.* A request does not call Kubernetes, the gossip layer, the shared state layer or the {agn-short} operator to decide where to go. It reads an already-accepted in-memory snapshot.
+====
+
+Overlay rendering is reconcile-driven, not request-driven. Sites should converge, but they are not guaranteed to hold identical views at every instant.
+
+== The Stack
+
+{agn-short} sits above the data plane. Each layer owns a different part of the problem.
+
+[cols="1,3", options="header"]
+|===
+| Layer | Role
+
+| *{agn-short} Operator*
+| Kubernetes control plane. Watches the grid custom resources, exchanges provider state with peers, scores candidates, publishes versioned routing overlays, reports rendered and distributed revisions, and manages control-plane trust material.
+
+| *{gateway}* (Praxis AI)
+| AI-aware gateway. Request parsing, `intelligent_route`, the provider-hop header contract, exact `provider_route`, optional `credential_inject`, and AI-specific packaging.
+
+| *External processor* (Praxis ExtProc)
+| Envoy `ExternalProcessor` service that runs the filter pipelines for deployments that retain Envoy in front of the gateway.
+
+| *Proxy and filter runtime* (Praxis Core)
+| Generic proxy and filter runtime. Owns listeners, filter pipelines, load balancing, `endpoint_selector`, `peer_identity_trust`, TLS integration and request context.
+
+| *Proxy engine* (Pingora)
+| Low-level async proxy engine. TCP and TLS, HTTP codecs, connection pooling, and upstream I/O.
+|===
+
+This split keeps the control plane focused on state preparation, and keeps request handling in the process that already owns the network hot path.
+
+=== Filter-First Data Plane
+
+One property of the runtime is worth knowing because it explains how gateway behaviour is composed: *every behaviour is a filter*. Cluster routing, load balancing, rate limiting and body-based routing are all filters, using the same traits, assembled into named chains.
+
+* A listener has a name and a list of filter chains. At startup the referenced chains are resolved and concatenated into a single pipeline per listener.
+* Request filters run in declared order, response filters in reverse. Any filter can short-circuit.
+* Chains are reusable. A security chain can be shared across public listeners while internal listeners skip it entirely.
+* Pipelines can be swapped at runtime without restarting the gateway or disrupting in-flight requests. A request pins a pipeline snapshot for its lifetime; a reload stores a new pipeline, and the next request picks it up while in-flight requests drain on the old one.
+
+This is why a routing overlay can be replaced without a pod restart, and why an invalid replacement does not take down what is already working.
+
+== Hub and Spoke
+
+A grid is laid out as a hub with spokes.
+
+* The *hub* carries the provider-facing control plane: multi-cluster management, identity, the grid control plane, the edge gateway, the consumer portal and the aggregated monitoring view.
+* The *spokes* carry inference capacity: GPU nodes, the serving runtime, the models, and a provider gateway in front of them.
+
+All clusters run the same base stack. What differs is which centralized services a given cluster hosts. One cluster is designated the hub and runs the shared pieces; the others participate as sites.
+
+----
+                 +------------------------------+
+                 |          HUB CLUSTER         |
+                 |  grid control plane          |
+                 |  edge gateway                |
+                 |  identity, portal, catalog   |
+                 |  aggregated monitoring       |
+                 +--------------+---------------+
+                                |
+          +---------------------+---------------------+
+          |                     |                     |
++---------v--------+  +---------v--------+  +---------v--------+
+|   SPOKE SITE A   |  |   SPOKE SITE B   |  |   SPOKE SITE C   |
+| provider gateway |  | provider gateway |  | provider gateway |
+| serving runtime  |  | serving runtime  |  | serving runtime  |
+| GPU + models     |  | GPU + models     |  | GPU + models     |
++------------------+  +------------------+  +------------------+
+----
+
+Sites exchange state with each other, not only with the hub. See xref:03-components.adoc#_state_distribution[State Distribution].
+
+== Global Ingress and Provider Boundaries
+
+External ingress uses *two independent routing decisions*. Mixing them up is the most common architecture mistake.
+
+----
+external client
+  -> managed DNS / Anycast / global traffic manager selects an edge
+  -> AI Gateway edge gateway authenticates and parses the request
+  -> intelligent_route selects an eligible provider from the local AGN overlay
+  -> gateway-to-gateway mTLS
+  -> AI Gateway provider gateway authenticates the edge
+  -> provider-local route and credential policy
+  -> private inference backend
+----
+
+The *first* decision is client to edge, and it belongs to the global traffic manager: the stable public name, edge health, public traffic steering and edge withdrawal. {aigrid} does not replace that service.
+
+The *second* decision is edge to provider, and that is where {aigrid} begins: after a request has reached an edge, select the provider that can satisfy the authenticated inference request.
+
+Keeping these separate has a practical payoff. The edge and provider fleets are independently replicated, so an east edge may select a west provider and a west edge may select an east provider. Model, tenant, provider admission and capacity policy stay out of DNS, and the outer traffic-management layer can focus purely on edge availability.
+
+=== The Provider Gateway Is a Security Boundary
+
+A provider gateway is not a transparent proxy. On every inbound hop it:
+
+. Authenticates the calling edge certificate
+. Validates the selected candidate against provider-local policy
+. Removes untrusted internal headers
+. Injects any provider-owned final-hop credential
+. Forwards only to an authorized private backend
+
+That is why consumer and edge gateways route to *provider gateways*, never directly to private inference endpoints.
+
+== Deployment Topologies
+
+Consumer and provider gateways do not have to run in separate clusters. The request and authorization contracts are identical in both topologies, so this is an infrastructure isolation decision rather than a functional one.
+
+=== Dedicated Consumer or Edge and Provider Clusters
+
+----
+workload or external client
+      |
+      v
++-----------------------------+
+| consumer or edge cluster    |
+|                             |
+| AI Gateway consumer/edge    |
++-----------------------------+
+      |
+      | authenticated provider hop
+      | gateway-to-gateway mTLS
+      v
++-----------------------------+
+| provider cluster            |
+|                             |
+| AI Gateway provider gateway |
+|      |                      |
+|      v                      |
+| private inference endpoint  |
++-----------------------------+
+----
+
+[cols="1,3", options="header"]
+|===
+| Property | Detail
+
+| Security boundary
+| Provider credentials, private backend addresses and provider-side authorization live in a cluster that does not host workload-facing gateways. Compromising the consumer cluster does not by itself grant access to provider Secrets or the provider control plane.
+
+| Failure domains
+| Consumer and provider roles use separate Kubernetes control planes, nodes and cluster networks. An outage or a failed upgrade affects one role without necessarily removing the other role's capacity.
+
+| Network isolation
+| Provider clusters can sit on restricted network segments reachable only through authenticated provider gateways. Consumers never need direct connectivity to private inference endpoints.
+
+| Ownership and compliance
+| Different teams can own the consumer and provider environments, certificates, policies, audit records and maintenance schedules. Regulated providers can stay outside a general workload cluster's administrative boundary.
+
+| Scaling and operations
+| Consumer gateways and provider capacity scale independently, with different node types, quotas, availability goals and rollout schedules. The cost is more clusters, certificates, network paths and operational coordination.
+|===
+
+Choose this when control-plane separation, credential isolation, restricted provider reachability, independent failure budgets or a smaller configuration blast radius justify the extra infrastructure.
+
+=== Combined Consumer and Provider Sites
+
+----
+local workload
+      |
+      v
++-----------------------------------+
+| combined-site cluster             |
+|                                   |
+| AI Gateway consumer gateway       |
+|      |                            |
+|      | separate identity, policy  |
+|      | and Service boundary       |
+|      v                            |
+| AI Gateway provider gateway       |
+|      |                            |
+|      v                            |
+| private inference endpoint        |
++-----------------------------------+
+      |
+      +---- eligible remote provider gateways at peer sites
+----
+
+[cols="1,3", options="header"]
+|===
+| Property | Detail
+
+| Logical separation
+| Consumer and provider gateways remain separate Deployments and Services, with distinct configuration, TLS identities, ServiceAccounts, authorization policies and Secret mounts. Combining a site does not mean combining both roles into one process.
+
+| Credential isolation
+| Provider credentials are mounted only in the provider gateway. NetworkPolicy and provider-route authorization prevent the consumer gateway and ordinary workloads from bypassing the provider gateway to reach the private inference endpoint.
+
+| Shared failure domain
+| Both roles share a Kubernetes control plane, cluster network and potentially the same nodes. A cluster-wide outage, administrative compromise or disruptive maintenance can affect both paths at once.
+
+| Resource efficiency
+| One cluster supplies local workload access and local provider capacity, reducing control-plane count and infrastructure cost. Separate requests, limits, scheduling rules and disruption policies should still stop one role starving the other.
+
+| Operational fit
+| Suits development, compact environments, branch locations and platforms where the same team owns both roles and the Kubernetes security boundary satisfies policy.
+|===
+
+Do not consolidate when provider credentials or networks must sit outside workload-cluster administration, when roles require separate compliance domains, or when sharing a cluster creates an unacceptable failure or change blast radius.
+
+=== Routing and Failover in Either Topology
+
+[cols="1,3", options="header"]
+|===
+| Rule | Detail
+
+| Provider selection
+| {agn-short} may select any eligible local or remote provider gateway present in the consumer's accepted routing overlay. Physical colocation does not make a provider automatically eligible.
+
+| Backend boundary
+| Consumer and edge gateways route to provider gateways, never directly to private inference endpoints. The provider gateway owns peer authentication, exact route authorization and final-hop credential injection.
+
+| Policy preservation
+| Failover stays within the candidate set authorized for the tenant, trust domain, compliance boundary, workload class and provider network. Reachability alone is not authorization.
+
+| High availability
+| Multiple replicas behind one logical gateway give process or node availability. Multiple logical gateways or sites give a separate routing and failure boundary. They are not interchangeable concepts.
+|===
+
+== Single-Site and Combined Deployments
+
+Grid membership is site-granular. Each {agn-short} operator is a single gossip node carrying its site's identity, and the members it discovers are other sites' operators, not the gateways, providers or pods inside a site.
+
+----
+Multi-site                            Single or combined site
+--------------------------------      ------------------------------
+site-a operator -- gossip -- site-b   one operator -- gossip (self only)
+      |                       |              |
+ local providers        local providers   several gateways / providers
+                                          (NOT gossip members)
+----
+
+Two things commonly surprise people on a single or combined cluster:
+
+* *Zero peers is expected, not a failure.* There is no second site to discover, so do not add seeds or extra operator replicas to "make discovery work".
+* *Local routing does not require the site to be `Active`.* Local inference providers are eligible regardless of site phase; only remote, cross-site provider records are phase-gated. A single-site deployment routes to its local providers even while its own site object is still `Pending`.
+
+== Trust and Readiness
+
+{agn-short} manages control-plane trust material. It can generate a site CA and site certificates, and it records public trust material and fingerprint policy for discovered sites.
+
+A site reaching phase `Active` currently means *control-plane eligibility* only:
+
+----
+the configured fingerprint matched
++ the TCP probe passed
+= AGN has enough information to consider the site for overlay generation
+----
+
+It does *not* prove that a gateway completed an mTLS handshake, accepted client identity, loaded the newest overlay, or authorized provider-side traffic. Those are data-plane readiness concerns. Readiness is expected to grow richer conditions over time, distinguishing states such as discovered, transport reachable, certificate pinned, mTLS verified, peer authorized, routing config loaded and routing ready.
+
+== Boundaries to Keep in Mind
+
+{aigrid} is intentionally not the whole platform. It prepares and publishes routing state, while the gateway, the proxy runtime, Kubernetes and the deployment owner each own different parts of the running system.
+
+The boundaries that matter most when you debug or design:
+
+* A site being `Active` is not the same as end-to-end gateway readiness.
+* A rendered or distributed overlay is not the same as a gateway accepting or serving that revision.
+* Credential references are not credential values.
+* Membership is not authorization. Discovery alone does not make a site routable.
+* Inference is the primary routed path. Agent tool and agent-to-agent surfaces are separate routed surfaces at different levels of maturity.
+
+When you evaluate a new feature, decide first which side owns it:
+
+----
+Does it change provider state, policy, scoring, or overlay content?
+  -> AGN control plane
+
+Does it change request parsing, route selection, credential injection,
+or upstream proxy behavior?
+  -> AI Gateway / proxy runtime data plane
+----
+
+== Next
+
+* xref:03-components.adoc[Components] for each component, custom resource and the overlay lifecycle
+* xref:04-request-flow.adoc[Request Flow] for the path of a single request
+* xref:05-topology-diagram.adoc[Interactive Topology] for a concrete multi-cluster layout
+
+== References
+
+* link:{upstream-grid}[Praxis Grid - Architecture Overview^]
+* link:{upstream-praxis}[Praxis - Architecture Overview^]

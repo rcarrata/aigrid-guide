@@ -1,0 +1,81 @@
+= Interactive Topology
+
+An interactive, clickable diagram of a multi-cluster {aigrid} deployment. Every cluster and component in it can be clicked to show what runs there.
+
+[NOTE]
+====
+*Credit.* This diagram was created by *Mario Vazquez*, and it is reused here with his authorship credited. The only change from his original is the datacenter name, replaced by the fictional *Fed Aura Capital WONDR2 Datacenter* so the diagram can be published outside Red Hat. Everything else is his work: the layout, the component placement, the flows and the interactions.
+
+Thanks Mario for letting this guide use it.
+====
+
+[subs="attributes"]
+++++
+<div style="border:1px solid #dee2e6;border-radius:8px;overflow:hidden;margin:1.5rem 0;">
+  <iframe src="{attachmentsdir}/ai-grid-topology.html"
+          title="AI Grid interactive topology diagram"
+          style="width:100%;height:860px;border:0;display:block;"
+          loading="lazy"></iframe>
+</div>
+<p style="text-align:center;font-size:.9rem;">
+  <a href="{attachmentsdir}/ai-grid-topology.html" target="_blank" rel="noopener">
+    <strong>Open the diagram in a new tab</strong>
+  </a>
+  (recommended on a laptop or desktop)
+</p>
+++++
+
+== What the Tabs Show
+
+The diagram has four views, each answering a different architecture question.
+
+[cols="1,3", options="header"]
+|===
+| Tab | What it answers
+
+| *Cluster's Location*
+| Where the clusters physically live. A cloud zone with an AWS `US-EAST` region and an Azure `US-WEST` region, each with an inference cluster, and an on-prem zone in the Fed Aura Capital WONDR2 Datacenter holding the hub cluster plus three GPU inference clusters (two NVIDIA L4 and one RTX 4000 PRO).
+
+| *Grid Architecture*
+| How the pieces connect. The control plane and inference entrypoint cluster, the Git repository that drives configuration, the inference clusters with the models each one serves, and two tenant clusters.
+
+| *Tenant User View*
+| How an inference request is routed through the grid, from a tenant user's point of view.
+
+| *Multi-Cluster Auth / Rate Limiting*
+| How authentication and rate limiting are enforced for a model across clusters.
+|===
+
+== Reading the Topology
+
+A few things in the diagram map directly onto concepts elsewhere in this guide.
+
+[cols="1,3", options="header"]
+|===
+| In the diagram | In this guide
+
+| Hub cluster / control plane
+| The hub described in xref:02-architecture.adoc#_hub_and_spoke[Hub and Spoke]. In the diagram it carries multi-cluster management, identity, the {maas-short} platform, the edge gateway, the consumer portal and metering.
+
+| Edge gateway on the hub
+| The consumer or edge role in xref:02-architecture.adoc#_global_ingress_and_provider_boundaries[Global Ingress]. It is where a client request lands and where `intelligent_route` picks a provider.
+
+| Provider gateway on each inference cluster
+| The provider role and security boundary described in xref:02-architecture.adoc#_the_provider_gateway_is_a_security_boundary[The Provider Gateway Is a Security Boundary].
+
+| Serving workloads per cluster
+| The serving runtime in xref:03-components.adoc#_serving_and_consumption_components[Serving and Consumption Components]. Note that the same model appears on several clusters, which is what makes cross-site routing and failover meaningful.
+
+| Git repository
+| The GitOps path that fans deployments and policy out to the right sites.
+
+| Tenant clusters
+| Clusters on the tenant side of the boundary. They are not where provider models run.
+|===
+
+TIP: The same model identifier served from more than one inference cluster is the case worth clicking through. That is the situation in which candidate scoring, locality and failover decide which site actually answers. See xref:03-components.adoc#_scoring_and_selection[Scoring and Selection].
+
+== Next
+
+* xref:02-architecture.adoc[Architecture Overview]
+* xref:04-request-flow.adoc[Request Flow]

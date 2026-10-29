@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<!-- AI Grid topology diagram. Original author: Mario Vazquez (mavazque).
+     Reused with credit in the AI Grid Guide. The only change versus the
+     original is the datacenter name, replaced by the fictional
+     "Fed Aura Capital WONDR2 Datacenter". -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Grid - Fed Aura Capital WONDR2</title>
+<style>
+:root{--bg:#f8f9fa;--card-bg:#fff;--border:#dee2e6;--text:#1e1e1e;--text-muted:#6c757d;--accent-aws:#ff9900;--accent-azure:#0078d4;--accent-onprem:#cc0000;--accent-cnv:#6c3483;--rh-red:#e03131;--rh-pink:#ffc9c9;--shadow-hover:0 6px 24px rgba(0,0,0,.15);--tr:all .3s cubic-bezier(.4,0,.2,1)}
+[data-theme="dark"]{--bg:#121417;--card-bg:#1e2025;--border:#3a3f47;--text:#e4e5e7;--text-muted:#a0a4ab;--rh-pink:#4a2020;--shadow-hover:0 6px 24px rgba(0,0,0,.5)}
+
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* TABS */
+.tab-bar{display:flex;justify-content:center;align-items:center;background:#fff;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:50}
+.theme-toggle{position:absolute;right:16px;width:36px;height:36px;border:none;background:none;cursor:pointer;border-radius:8px;display:flex;align-items:center;justify-content:center;transition:var(--tr);color:var(--text-muted)}
+.theme-toggle:hover{background:#f1f3f5;color:var(--text)}
+.theme-toggle svg{width:20px;height:20px}
+.theme-toggle .icon-moon{display:none}
+.theme-toggle .icon-sun{display:none}
+.theme-toggle .icon-moon{display:block}
+[data-theme="dark"] .theme-toggle .icon-sun{display:block}
+[data-theme="dark"] .theme-toggle .icon-moon{display:none}
+.tab-btn{padding:14px 32px;font-size:.95rem;font-weight:700;border:none;background:none;cursor:pointer;color:var(--text-muted);position:relative;transition:var(--tr)}
+.tab-btn:hover{color:var(--text)}
+.tab-btn.active{color:var(--rh-red)}
+.tab-btn.active::after{content:'';position:absolute;bottom:-2px;left:0;right:0;height:3px;background:var(--rh-red);border-radius:3px 3px 0 0}
+.tab-viewport{overflow:hidden}
+.tab-slider{display:flex;transition:transform .45s cubic-bezier(.4,0,.2,1);width:400%}
+.tab-panel{width:25%;flex-shrink:0;padding:24px}
+.tab-slider.at-1{transform:translateX(-25%)}
+.tab-slider.at-2{transform:translateX(-50%)}
+.tab-slider.at-3{transform:translateX(-75%)}
+
+/* ---- LOCATION TAB ---- */
+.diagram{max-width:1200px;margin:0 auto;display:flex;flex-direction:column}
+.zone{padding:24px}.zone-label{font-size:1rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:20px;display:flex;align-items:center;gap:10px;color:var(--text-muted)}
+.zone-label .icon{width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center}
+.zone-divider{width:100%;height:2px;background:var(--text);margin:4px 0}
+.cloud-regions{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.onprem-clusters{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:20px}
+.region-card{background:var(--card-bg);border:2px solid var(--border);border-radius:16px;padding:20px;transition:var(--tr);cursor:pointer;overflow:hidden}
+.region-card:hover{box-shadow:var(--shadow-hover);transform:translateY(-2px)}
+.region-card.aws{border-top:4px solid var(--accent-aws)}.region-card.azure{border-top:4px solid var(--accent-azure)}
+.region-header{display:flex;align-items:center;gap:10px;margin-bottom:16px;font-size:1.05rem;font-weight:700}
+.region-badge{font-size:.7rem;font-weight:600;padding:3px 8px;border-radius:4px;color:#fff;text-transform:uppercase;letter-spacing:.05em}
+.aws .region-badge{background:var(--accent-aws)}.azure .region-badge{background:var(--accent-azure)}
+.region-clusters{display:flex;flex-wrap:wrap;gap:12px}
+.cluster-node{display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px;border-radius:10px;transition:var(--tr);cursor:pointer;position:relative;min-width:120px;flex:1}
+.cluster-node:hover{background:#f1f3f5;transform:scale(1.04)}
+.cluster-node:hover .server-icon{box-shadow:0 4px 16px rgba(219,33,47,.2)}
+.cluster-node.active{background:#fff3f3;outline:2px solid var(--rh-red);outline-offset:2px}
+.server-icon{width:64px;height:80px;border:2px solid #333;border-radius:4px;background:#f8f9fa;position:relative;display:flex;flex-direction:column;justify-content:flex-start;padding-top:6px;gap:3px;overflow:hidden;transition:var(--tr)}
+.server-slot{width:44px;height:2px;background:#333;margin:0 auto}
+.rh-logo{position:absolute;bottom:6px;left:50%;transform:translateX(-50%);width:20px;height:20px}
+.rh-logo svg{width:100%;height:100%}
+.cluster-label{font-size:.78rem;font-weight:600;text-align:center;line-height:1.3}
+.cluster-sublabel{font-size:.68rem;color:var(--text-muted);text-align:center}
+.cnv-wrapper{background:var(--card-bg);border:2px solid var(--border);border-radius:16px;padding:16px;transition:var(--tr);cursor:pointer;grid-column:span 2;border-top:4px solid var(--accent-cnv)}
+.cnv-wrapper:hover{box-shadow:var(--shadow-hover);transform:translateY(-2px)}
+.cnv-header{font-size:.85rem;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.cnv-badge{font-size:.65rem;font-weight:600;padding:2px 7px;border-radius:4px;background:var(--accent-cnv);color:#fff;text-transform:uppercase}
+.cnv-clusters{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.cluster-node[data-tooltip]:hover::after{content:attr(data-tooltip);position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:#1e1e1e;color:#fff;font-size:.72rem;padding:5px 10px;border-radius:6px;white-space:nowrap;z-index:10;pointer-events:none}
+.legend{display:flex;flex-wrap:wrap;gap:16px;justify-content:center;margin-top:24px;padding:12px 16px;background:#fff;border-radius:10px;border:1px solid var(--border);font-size:.8rem;color:var(--text-muted)}
+.legend-item{display:flex;align-items:center;gap:6px}
+.legend-swatch{width:14px;height:14px;border-radius:3px;border:1px solid rgba(0,0,0,.1)}
+
+/* MODAL */
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:200;opacity:0;pointer-events:none;transition:opacity .25s}
+.modal-backdrop.visible{opacity:1;pointer-events:all}
+.info-panel{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(.95);width:620px;max-width:calc(100vw - 40px);max-height:80vh;background:#fff;border:1px solid var(--border);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.25);padding:32px;opacity:0;pointer-events:none;transition:var(--tr);z-index:300;overflow-y:auto}
+.info-panel.visible{transform:translate(-50%,-50%) scale(1);opacity:1;pointer-events:all}
+.info-panel h3{font-size:1.3rem;margin-bottom:16px;display:flex;align-items:center;gap:10px;padding-right:36px}
+.info-panel .close-btn{position:absolute;top:16px;right:16px;width:34px;height:34px;border:none;background:#f1f3f5;border-radius:8px;cursor:pointer;font-size:1.2rem;display:flex;align-items:center;justify-content:center;transition:var(--tr)}
+.info-panel .close-btn:hover{background:#dee2e6}
+.info-panel .detail-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f1f3f5;font-size:.9rem}
+.info-panel .detail-row:last-child{border-bottom:none}
+.detail-key{color:var(--text-muted)}.detail-val{font-weight:600}
+.info-panel .section-label{font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-top:20px;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #e9ecef}
+.component-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:4px}
+.component-box{border:2px solid var(--text);border-radius:12px;padding:14px 16px;background:#fff;text-align:center;font-size:.88rem;font-weight:600;transition:var(--tr);display:flex;align-items:center;justify-content:center;min-height:52px}
+.component-box:hover{background:#f8f9fa;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.component-box.optional{border-style:dashed;border-width:2.5px;color:var(--text-muted)}
+
+/* ===== ARCHITECTURE TAB ===== */
+.arch-scroll{overflow-x:auto;padding-bottom:24px}
+.arch-canvas{position:relative;width:1400px;height:1150px;margin:0 auto}
+
+/* Clickable nodes */
+.anode{position:absolute;z-index:1;cursor:pointer;transition:var(--tr)}
+.anode:hover{z-index:2}
+
+/* Person icons */
+.person{display:flex;flex-direction:column;align-items:center;gap:4px}
+.person-icon{width:44px;height:44px;fill:var(--text-muted)}
+.person span{font-size:13px;font-weight:700;color:var(--text);white-space:nowrap}
+
+/* Boxes */
+.abox{border:2px solid var(--border);border-radius:12px;padding:12px 16px;background:#fff;font-size:13px;font-weight:600;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.06);transition:var(--tr)}
+.abox:hover{box-shadow:0 4px 12px rgba(0,0,0,.1)}
+.abox.dashed{border-style:dashed;border-color:#adb5bd}
+
+/* Large cluster region */
+.aregion{border:2px solid var(--border);border-radius:16px;background:#fff;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.06);transition:var(--tr);border-top:4px solid var(--rh-red)}
+.aregion:hover{box-shadow:var(--shadow-hover)}
+.aregion-title{font-size:13px;font-weight:600;color:var(--text-muted);margin-bottom:4px}
+.aregion-sub{font-size:14px;font-weight:700;margin-bottom:12px;text-align:center}
+
+/* Inner box */
+.ainner{border:2px solid var(--border);border-radius:12px;background:#fff;padding:12px 14px;box-shadow:0 1px 3px rgba(0,0,0,.06);transition:var(--tr)}
+.ainner:hover{box-shadow:0 4px 12px rgba(0,0,0,.1)}
+.ainner-title{font-size:13px;font-weight:700;margin-bottom:8px}
+.ainner-row{display:flex;gap:8px;flex-wrap:wrap}
+
+/* chip */
+.achip{border:2px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;background:#fff;white-space:nowrap;text-align:center;transition:var(--tr)}
+.achip:hover{background:#f1f3f5}
+.achip.dashed{border-style:dashed;border-color:#adb5bd;color:var(--text-muted)}
+.achip.model{background:#f8f9fa;border-color:var(--text-muted);min-width:36px}
+
+/* Big bottom cluster area */
+.abig{position:absolute;border:2px solid var(--border);border-radius:16px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.04);border-top:4px solid var(--rh-red)}
+
+/* User groups */
+.users{display:flex;flex-direction:column;align-items:center;gap:4px}
+.users-icon{width:48px;height:36px;fill:var(--text-muted)}
+.users span{font-size:12px;font-weight:700;white-space:nowrap}
+
+/* SVG arrow layer -- ABOVE nodes */
+.asvg{position:absolute;inset:0;pointer-events:none;z-index:10;overflow:visible}
+.asvg line,.asvg polyline,.asvg path{fill:none;stroke:var(--text-muted);stroke-width:1.5}
+.asvg .dashed{stroke-dasharray:8 6}
+.asvg text{font-family:inherit}
+
+/* Connection glow */
+@keyframes connGlow{0%,100%{box-shadow:0 0 8px 2px rgba(224,49,49,.15)}50%{box-shadow:0 0 18px 5px rgba(224,49,49,.4)}}
+.connectable{animation:connGlow 2.5s ease-in-out infinite;position:relative}
+.connectable::after{content:'Click to view connections';position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:#1e1e1e;color:#fff;font-size:.7rem;padding:4px 10px;border-radius:6px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .2s}
+.connectable:hover{animation:none;box-shadow:0 0 22px 6px rgba(224,49,49,.5)!important}
+.connectable:hover::after{opacity:1}
+
+/* Connection panel (fixed left sidebar) */
+#connBackdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.18);z-index:150}
+#connPanel{display:none;position:fixed;left:20px;top:50%;transform:translateY(-50%);width:250px;background:#fff;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,.2);z-index:160;overflow:hidden}
+#connSvg{display:none;position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:155;overflow:visible}
+.conn-chip{display:block;width:100%;border:2px solid var(--border);border-radius:8px;padding:9px 14px;font-size:12px;font-weight:600;background:#fff;cursor:pointer;transition:var(--tr);text-align:left;font-family:inherit}
+.conn-chip:hover{background:#fff3f3;border-color:var(--rh-red);color:var(--rh-red)}
+.conn-chip.active{background:#fff3f3;border-color:var(--rh-red);color:var(--rh-red);box-shadow:0 0 10px rgba(224,49,49,.25)}
+
+/* Persona icons */
+.persona-btn{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 14px;border-radius:12px;cursor:pointer;border:2px solid var(--border);background:#fff;transition:var(--tr)}
+.persona-btn svg{width:32px;height:32px;fill:var(--text-muted)}
+.persona-btn span{font-size:11px;font-weight:700;color:var(--text-muted);white-space:nowrap}
+.persona-btn:hover{background:#fff3f3;border-color:var(--rh-red)}
+.persona-btn:hover svg{fill:var(--rh-red)}
+.persona-btn:hover span{color:var(--rh-red)}
+
+
+/* ===== FLOW TAB ===== */
+.flow-wrap{max-width:1200px;margin:0 auto}
+.flow-tabs{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+.flow-tab{padding:10px 18px;font-size:.85rem;font-weight:600;border:2px solid var(--border);border-radius:10px;background:#fff;cursor:pointer;transition:var(--tr);font-family:inherit}
+.flow-tab:hover{border-color:var(--rh-red);color:var(--rh-red)}
+.flow-tab.active{background:var(--rh-red);color:#fff;border-color:var(--rh-red)}
+.flow-scene{position:relative;background:#fff;border:2px solid var(--border);border-radius:16px;padding:20px;overflow-x:auto}
+.flow-scene svg{display:block;margin:0 auto}
+.flow-desc{font-size:.85rem;color:var(--text-muted);margin-bottom:16px;line-height:1.5}
+.flow-legend{display:flex;gap:20px;margin-top:16px;font-size:.78rem;color:var(--text-muted);flex-wrap:wrap}
+.flow-legend-item{display:flex;align-items:center;gap:6px}
+.scenario-tabs{display:flex;gap:6px;margin-bottom:14px}
+.scenario-tab{padding:7px 14px;font-size:.78rem;font-weight:600;border:2px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;transition:var(--tr);font-family:inherit}
+.scenario-tab:hover{border-color:#228be6;color:#228be6}
+.scenario-tab.active{background:#228be6;color:#fff;border-color:#228be6}
+.scenario-tab.fail{background:var(--rh-red);color:#fff;border-color:var(--rh-red)}
+
+/* Dark mode overrides */
+[data-theme="dark"] .tab-bar{background:var(--card-bg);border-color:var(--border)}
+[data-theme="dark"] .tab-btn{color:var(--text-muted)}
+[data-theme="dark"] .tab-btn:hover{color:var(--text)}
+[data-theme="dark"] .region-card,[data-theme="dark"] .abox,[data-theme="dark"] .aregion,[data-theme="dark"] .ainner,[data-theme="dark"] .achip,[data-theme="dark"] .flow-scene,[data-theme="dark"] .flow-tab,[data-theme="dark"] .scenario-tab,[data-theme="dark"] .persona-btn,[data-theme="dark"] .conn-chip{background:var(--card-bg);color:var(--text)}
+[data-theme="dark"] .achip.model{background:#282a30;border-color:#5c6370}
+[data-theme="dark"] .server-icon{background:#282a30;border-color:#5c6370}
+[data-theme="dark"] .server-slot{background:#5c6370}
+[data-theme="dark"] .legend{background:var(--card-bg);border-color:var(--border)}
+[data-theme="dark"] .cnv-wrapper{background:var(--card-bg)}
+[data-theme="dark"] .cluster-node:hover{background:#282a30}
+[data-theme="dark"] .info-panel{background:#1e2025;border-color:var(--border);color:var(--text)}
+[data-theme="dark"] .info-panel .close-btn{background:#3a3f47;color:var(--text)}
+[data-theme="dark"] .info-panel .close-btn:hover{background:#4e545e}
+[data-theme="dark"] .info-panel .detail-row{border-color:#2e3138}
+[data-theme="dark"] .info-panel .section-label{border-color:#2e3138}
+[data-theme="dark"] .component-box{border-color:#5c6370;color:var(--text);background:var(--card-bg)}
+[data-theme="dark"] .component-box:hover{background:#282a30}
+[data-theme="dark"] .component-box.optional{border-color:#4e545e;color:var(--text-muted)}
+[data-theme="dark"] #connPanel{background:#1e2025;color:var(--text)}
+[data-theme="dark"] #connBackdrop{background:rgba(0,0,0,.55)}
+[data-theme="dark"] .conn-chip{background:#1e2025;border-color:var(--border);color:var(--text)}
+[data-theme="dark"] .conn-chip:hover{background:#3a1c1c;border-color:#e03131;color:#ff6b6b}
+[data-theme="dark"] .conn-chip.active{background:#3a1c1c;border-color:#e03131;color:#ff6b6b}
+[data-theme="dark"] .flow-tab{background:var(--card-bg);border-color:var(--border);color:var(--text)}
+[data-theme="dark"] .flow-tab:hover{border-color:#ff6b6b;color:#ff6b6b}
+[data-theme="dark"] .flow-tab.active{background:var(--rh-red);color:#fff;border-color:var(--rh-red)}
+[data-theme="dark"] .scenario-tab{background:var(--card-bg);border-color:var(--border);color:var(--text)}
+[data-theme="dark"] .scenario-tab:hover{border-color:#4dabf7;color:#4dabf7}
+[data-theme="dark"] .scenario-tab.active{background:#228be6;color:#fff}
+[data-theme="dark"] .persona-btn{background:var(--card-bg);border-color:var(--border);color:var(--text)}
+[data-theme="dark"] .persona-btn svg{fill:var(--text-muted)}
+[data-theme="dark"] .persona-btn span{color:var(--text-muted)}
+[data-theme="dark"] .persona-btn:hover{background:#3a1c1c;border-color:#e03131}
+[data-theme="dark"] .persona-btn:hover svg{fill:#ff6b6b}
+[data-theme="dark"] .persona-btn:hover span{color:#ff6b6b}
+[data-theme="dark"] .connectable::after{background:#1e2025;color:var(--text)}
+[data-theme="dark"] .theme-toggle{color:var(--text-muted)}
+[data-theme="dark"] .theme-toggle:hover{color:var(--text);background:#3a3f47}
+[data-theme="dark"] .zone-divider{background:var(--text-muted)}
+[data-theme="dark"] .modal-backdrop.visible{background:rgba(0,0,0,.55)}
+[data-theme="dark"] .cluster-node.active{background:#2a1a1a;outline-color:#e03131}
+[data-theme="dark"] .achip:hover{background:#282a30}
+[data-theme="dark"] .achip.dashed{border-color:#5c6370;color:var(--text-muted)}
+[data-theme="dark"] .abox.dashed{border-color:#5c6370}
+[data-theme="dark"] .legend-swatch{border-color:rgba(255,255,255,.2)}
+
+@media(max-width:1440px){.arch-scroll{overflow-x:auto}}
+@media(max-width:900px){
+  .cloud-regions{grid-template-columns:1fr}
+  .onprem-clusters{grid-template-columns:repeat(2,1fr)}
+  .cnv-wrapper{grid-column:span 2}
+  .tab-btn{padding:12px 18px;font-size:.85rem}
+  /* Architecture tab responsive */
+  .arch-cloud-grid{grid-template-columns:1fr!important}
+  .arch-inf-grid{grid-template-columns:1fr 1fr!important}
+  .ainner-row{flex-wrap:wrap}
+  .persona-btn{padding:8px 10px}
+  .persona-btn svg{width:26px;height:26px}
+  .persona-btn span{font-size:10px}
+}
+@media(max-width:600px){
+  .onprem-clusters{grid-template-columns:1fr}
+  .cnv-wrapper{grid-column:span 1}
+  .cnv-clusters{grid-template-columns:1fr}
+  .tab-panel{padding:12px}
+  .info-panel{width:calc(100% - 24px)}
+  /* Architecture tab responsive */
+  .arch-cloud-grid{grid-template-columns:1fr!important}
+  .arch-inf-grid{grid-template-columns:1fr!important}
+  .arch-tenant-grid{grid-template-columns:1fr!important}
+  .persona-btn{padding:6px 8px}
+  .persona-btn svg{width:22px;height:22px}
+  .persona-btn span{font-size:9px}
+  .tab-btn{padding:10px 12px;font-size:.78rem}
+  .connectable::after{display:none}
+  #connPanel{width:200px;left:10px}
+  .flow-tabs{gap:6px}
+  .flow-tab{padding:8px 12px;font-size:.78rem}
+  .scenario-tabs{flex-wrap:wrap}
+}
+</style>
+</head>
+<body>
+
+<div class="tab-bar" style="position:relative">
+  <button class="tab-btn" onclick="switchTab(0)">Cluster's Location</button>
+  <button class="tab-btn active" onclick="switchTab(1)">Grid Architecture</button>
+  <button class="tab-btn" onclick="switchTab(2)">Tenant User View</button>
+  <button class="tab-btn" onclick="switchTab(3)">Multi-Cluster Auth/Rate Limiting</button>
+  <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode">
+    <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+    <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+  </button>
+</div>
+
+<div class="tab-viewport">
+<div class="tab-slider at-1" id="tabSlider">
+
+<!-- ======== TAB 0 ======== -->
+<div class="tab-panel">
+<div class="diagram">
+  <div class="zone cloud-zone"><div class="zone-label"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path></svg></span>CLOUD</div>
+    <div class="cloud-regions">
+      <div class="region-card aws" onclick="showInfo('aws-region')"><div class="region-header"><span class="region-badge">AWS</span>US-EAST</div><div class="region-clusters"><div class="cluster-node" data-id="aws-inf1" data-tooltip="Click for details" onclick="event.stopPropagation();showInfo('aws-inf1')"><div class="server-icon"><div class="server-slot"></div><div class="server-slot"></div><div class="server-slot"></div><div class="server-slot"></div><div class="rh-logo"><svg viewBox="0 0 24 24"><path d="M12 2L6 8l2 2 4-4 4 4 2-2z" fill="#db212f"></path><path d="M12 22l6-6-2-2-4 4-4-4-2 2z" fill="#db212f"></path></svg></div></div><div class="cluster-label">Inference Cluster 1</div></div></div></div>
+      <div class="region-card azure" onclick="showInfo('azure-region')"><div class="region-header"><span class="region-badge">AZURE</span>US-WEST</div><div class="region-clusters"><div class="cluster-node" data-id="azure-inf1" data-tooltip="Click for details" onclick="event.stopPropagation();showInfo('azure-inf1')"><div class="server-icon"><div class="server-slot"></div><div class="server-slot"></div><div class="server-slot"></div><div class="server-slot"></div><div class="rh-logo"><svg viewBox="0 0 24 24"><path d="M12 2L6 8l2 2 4-4 4 4 2-2z" fill="#db212f"></path><path d="M12 22l6-6-2-2-4 4-4-4-2 2z" fill="#db212f"></path></svg></div></div><div class="cluster-label">Inference Cluster 2</div></div></div></div>
+    </div>
+  </div>
+  <div class="zone-divider" style="margin:8px 24px"></div>
+  <div class="zone onprem-zone"><div class="zone-label"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><rect x="2" y="2" width="20" height="8" rx="2"></rect><rect x="2" y="14" width="20" height="8" rx="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg></span>ON PREM — Fed Aura Capital WONDR2 Datacenter</div>
+    <div class="onprem-clusters">
+      <div class="cluster-node" data-id="hub" data-tooltip="Control Plane" onclick="showInfo('hub')"><div class="server-icon" style="border-color:var(--rh-red)"><div class="server-slot"></div><div class="server-slot"></div><div class="server-slot"></div><div class="server-slot"></div><div class="rh-logo"><svg viewBox="0 0 24 24"><path d="M12 2L6 8l2 2 4-4 4 4 2-2z" fill="#db212f"></path><path d="M12 22l6-6-2-2-4 4-4-4-2 2z" fill="#db212f"></path></svg></div></div><div class="cluster-label">Hub Cluster / AI Grid</div><div class="cluster-sublabel">Control Plane</div></div>
+      <div class="cluster-node" data-id="l4-0" onclick="showInfo('l4-0')"><div class="server-icon"><div class="server-slot"></div><div class="server-slot"></div><div class="server-slot"></div><div class="server-slot"></div><div class="rh-logo"><svg viewBox="0 0 24 24"><path d="M12 2L6 8l2 2 4-4 4 4 2-2z" fill="#db212f"></path><path d="M12 22l6-6-2-2-4 4-4-4-2 2z" fill="#db212f"></path></svg></div></div><div class="cluster-label">Inference Cluster</div><div class="cluster-sublabel">L4-0</div></div>
+      <div class="cluster-node" data-id="l4-1" onclick="showInfo('l4-1')"><div class="server-icon"><div class="server-slot"></div><div class="server-slot"></div><div class="server-slot"></div><div class="server-slot"></div><div class="rh-logo"><svg viewBox="0 0 24 24"><path d="M12 2L6 8l2 2 4-4 4 4 2-2z" fill="#db212f"></path><path d="M12 22l6-6-2-2-4 4-4-4-2 2z" fill="#db212f"></path></svg></div></div><div class="cluster-label">Inference Cluster</div><div class="cluster-sublabel">L4-1</div></div>
+      <div class="cluster-node" data-id="rtx-0" onclick="showInfo('rtx-0')"><div class="server-icon"><div class="server-slot"></div><div class="server-slot"></div><div class="server-slot"></div><div class="server-slot"></div><div class="rh-logo"><svg viewBox="0 0 24 24"><path d="M12 2L6 8l2 2 4-4 4 4 2-2z" fill="#db212f"></path><path d="M12 22l6-6-2-2-4 4-4-4-2 2z" fill="#db212f"></path></svg></div></div><div class="cluster-label">Inference Cluster</div><div class="cluster-sublabel">RTX-0</div></div>
+    </div>
+  </div>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-swatch" style="background:var(--accent-aws)"></div>AWS</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:var(--accent-azure)"></div>Azure</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:var(--accent-onprem)"></div>On-Prem</div>
+    <div class="legend-item"><div class="legend-swatch" style="border:2px dashed var(--text);background:transparent"></div>Optional</div>
+  </div>
+</div>
+</div>
+
+<!-- ======== TAB 1: ARCHITECTURE ======== -->
+<div class="tab-panel">
+<div id="archWrap" class="arch-wrap" style="max-width:1200px;margin:0 auto;position:relative">
+
+  <!-- Personas -->
+  <div style="display:flex;gap:12px;margin-bottom:20px">
+    <div class="persona-btn connectable" onclick="event.stopPropagation();showConnView('persona-admin')">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"></path></svg>
+      <span>AI Grid Admin</span>
+    </div>
+    <div class="persona-btn connectable" onclick="event.stopPropagation();showConnView('persona-tadmin')">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"></path></svg>
+      <span>Tenant Admin</span>
+    </div>
+    <div class="persona-btn connectable" onclick="event.stopPropagation();showConnView('persona-tuser')">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"></path></svg>
+      <span>Tenant Users</span>
+    </div>
+  </div>
+
+  <!-- Git Repository (top left) -->
+  <div id="nd-git" style="margin-bottom:20px;display:inline-block;cursor:pointer" onclick="showInfo('arch-git')">
+    <div class="abox" style="padding:14px 18px">
+      <div style="font-weight:700;margin-bottom:8px;font-size:14px">Git Repository</div>
+      <div style="display:flex;gap:8px;justify-content:center">
+        <div class="achip">IaaC</div>
+        <div class="achip">CaaC</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SVG reserved for future use -->
+  <svg id="archSvg" class="asvg" style="position:absolute;left:0;top:0;pointer-events:none;z-index:10;overflow:visible"></svg>
+
+  <!-- ===== CLOUD PROVIDERS (top box) ===== -->
+  <div class="aregion" style="margin-bottom:20px;cursor:default">
+    <div class="aregion-sub" style="text-align:left;margin-bottom:14px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18" style="vertical-align:middle;margin-right:6px"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path></svg>
+      Cloud Providers
+    </div>
+    <div class="arch-cloud-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+
+      <!-- Amazon -->
+      <div id="nd-aws" class="ainner connectable" style="border-top:3px solid var(--accent-aws);cursor:pointer" onclick="event.stopPropagation();showConnView('nd-aws')">
+        <div style="font-size:11px;font-weight:700;color:var(--accent-aws);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px">Amazon Web Services</div>
+        <div class="ainner-title">Inference Cluster #1</div>
+        <div class="ainner-row" style="margin-bottom:8px">
+          <div class="achip">RHOAI</div>
+          <div id="nd-aws-maas" class="achip">Praxis Provider Gateway</div>
+          <div id="nd-aws-llmd" style="border:2px solid var(--border);border-radius:10px;padding:8px;flex:1">
+            <div style="font-size:12px;font-weight:700;margin-bottom:4px;color:var(--text-muted)">LLMD</div>
+            <div style="display:flex;gap:5px">
+              <div id="nd-aws-m1" class="achip model">M1</div>
+              <div id="nd-aws-m2" class="achip model">M2</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Azure -->
+      <div id="nd-azure" class="ainner connectable" style="border-top:3px solid var(--accent-azure);cursor:pointer" onclick="event.stopPropagation();showConnView('nd-azure')">
+        <div style="font-size:11px;font-weight:700;color:var(--accent-azure);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px">Microsoft Azure</div>
+        <div class="ainner-title">Inference Cluster #2</div>
+        <div class="ainner-row" style="margin-bottom:8px">
+          <div class="achip">RHOAI</div>
+          <div id="nd-azure-maas" class="achip">Praxis Provider Gateway</div>
+          <div id="nd-azure-llmd" style="border:2px solid var(--border);border-radius:10px;padding:8px;flex:1">
+            <div style="font-size:12px;font-weight:700;margin-bottom:4px;color:var(--text-muted)">LLMD</div>
+            <div style="display:flex;gap:5px">
+              <div id="nd-azure-m1" class="achip model">M1</div>
+              <div id="nd-azure-m3" class="achip model">M3</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== ON-PREM (bottom box) ===== -->
+  <div class="aregion" style="cursor:default">
+    <div class="aregion-sub" style="text-align:left;margin-bottom:14px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18" style="vertical-align:middle;margin-right:6px"><rect x="2" y="2" width="20" height="8" rx="2"></rect><rect x="2" y="14" width="20" height="8" rx="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+      On-Prem — Fed Aura Capital WONDR2 Datacenter
+    </div>
+
+    <!-- AI Grid Control Plane (standalone) -->
+    <div id="nd-mgmt" class="ainner connectable" style="border-top:3px solid var(--rh-red);cursor:pointer;margin-bottom:16px" onclick="event.stopPropagation();showConnView('nd-mgmt')">
+      <div class="ainner-title">AI Grid Control Plane / Inference Entrypoint Cluster</div>
+      <div class="ainner-row">
+        <div class="achip">RHACM</div>
+        <div class="achip">Keycloak</div>
+        <div id="nd-llmd-gw" class="achip">Praxis Edge Gateway</div>
+        <div id="nd-mgmt-maas" class="achip">MaaS</div>
+        <div id="nd-consumer-portal" class="achip">Consumer Portal UI</div>
+        <div id="nd-metering" class="achip">Metering System</div>
+      </div>
+    </div>
+
+    <!-- Inference Clusters sub-box -->
+    <div id="nd-inf-clusters" class="ainner" style="margin-bottom:16px;border-top:3px solid #228be6">
+      <div class="ainner-title" style="margin-bottom:12px">Inference Clusters</div>
+      <div class="arch-inf-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
+
+        <!-- L4-0 -->
+        <div id="nd-l40" class="ainner connectable" style="cursor:pointer" onclick="event.stopPropagation();showConnView('nd-l40')">
+          <div class="ainner-title">L4-0</div>
+          <div class="ainner-row" style="margin-bottom:8px">
+            <div class="achip">RHOAI</div>
+            <div id="nd-l40-maas" class="achip">Praxis Provider Gateway</div>
+          </div>
+          <div id="nd-l40-llmd" style="border:2px solid var(--border);border-radius:10px;padding:8px">
+            <div style="font-size:12px;font-weight:700;margin-bottom:4px;color:var(--text-muted)">LLMD</div>
+            <div style="display:flex;gap:5px">
+              <div id="nd-l40-m1" class="achip model">M1</div>
+              <div id="nd-l40-m4" class="achip model">M4</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- L4-1 -->
+        <div id="nd-l41" class="ainner connectable" style="cursor:pointer" onclick="event.stopPropagation();showConnView('nd-l41')">
+          <div class="ainner-title">L4-1</div>
+          <div class="ainner-row" style="margin-bottom:8px">
+            <div class="achip">RHOAI</div>
+            <div id="nd-l41-maas" class="achip">Praxis Provider Gateway</div>
+          </div>
+          <div id="nd-l41-llmd" style="border:2px solid var(--border);border-radius:10px;padding:8px">
+            <div style="font-size:12px;font-weight:700;margin-bottom:4px;color:var(--text-muted)">LLMD</div>
+            <div style="display:flex;gap:5px">
+              <div id="nd-l41-m1" class="achip model">M1</div>
+              <div id="nd-l41-m5" class="achip model">M5</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RTX-0 -->
+        <div id="nd-rtx0" class="ainner connectable" style="cursor:pointer" onclick="event.stopPropagation();showConnView('nd-rtx0')">
+          <div class="ainner-title">RTX-0</div>
+          <div class="ainner-row" style="margin-bottom:8px">
+            <div class="achip">RHOAI</div>
+            <div id="nd-rtx0-maas" class="achip">Praxis Provider Gateway</div>
+          </div>
+          <div id="nd-rtx0-llmd" style="border:2px solid var(--border);border-radius:10px;padding:8px">
+            <div style="font-size:12px;font-weight:700;margin-bottom:4px;color:var(--text-muted)">LLMD</div>
+            <div style="display:flex;gap:5px">
+              <div id="nd-rtx0-m1" class="achip model">M1</div>
+              <div id="nd-rtx0-m6" class="achip model">M6</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+</div>
+</div>
+
+<!-- ======== TAB 2: TENANT USER VIEW ======== -->
+<div class="tab-panel">
+<div class="flow-wrap">
+  <div style="margin-bottom:20px">
+    <h2 style="font-size:1.3rem;font-weight:700;margin-bottom:6px">Tenant User View</h2>
+    <p style="font-size:.9rem;color:var(--text-muted)">How inference requests are routed through the grid, from a tenant user's perspective.</p>
+  </div>
+
+  <div class="flow-tabs">
+    <button class="flow-tab active" onclick="selectFlow(0,this)">External Model (M6)</button>
+    <button class="flow-tab" onclick="selectFlow(1,this)">Multi-Cluster Model (M1)</button>
+  </div>
+
+  <div id="flowContainer"></div>
+</div>
+</div>
+
+<!-- ======== TAB 3: AUTH / RATE LIMITING ======== -->
+<div class="tab-panel">
+<div class="flow-wrap">
+  <div style="margin-bottom:20px">
+    <h2 style="font-size:1.3rem;font-weight:700;margin-bottom:6px">Multi-Cluster Model Auth / Rate Limiting</h2>
+    <p style="font-size:.9rem;color:var(--text-muted);line-height:1.6">
+      Authentication and rate limiting are enforced centrally at the <strong>Inference Entrypoint MaaS</strong>.
+      The <strong>Tenant Admin</strong> configures per-user quotas (e.g. 100k tokens/min) and the
+      <strong>Grid Admin</strong> configures per-tenant aggregate quotas (e.g. 1M tokens/min).
+      Users get their API keys from the Consumer Portal UI and call the Inference Entrypoint MaaS directly.
+    </p>
+    <p style="font-size:.82rem;color:#2b8a3e;margin-top:8px;font-weight:600">
+      ✓ Because every request funnels through the single Inference Entrypoint MaaS, per-user quotas are now enforced globally across the grid.
+    </p>
+  </div>
+
+  <div id="authFlowContainer"></div>
+</div>
+</div>
+
+</div></div>
+
+<!-- MODAL -->
+<div class="modal-backdrop" id="modalBackdrop" onclick="hideInfo()"></div>
+<div class="info-panel" id="infoPanel"><button class="close-btn" onclick="hideInfo()">×</button><h3 id="infoTitle"><span style="width:14px;height:14px;border-radius:4px;background:#e03131;display:inline-block;flex-shrink:0"></span> AI Grid Control Plane / Inference Entrypoint Cluster</h3><div id="infoBody"><div class="detail-row"><span class="detail-key">Location</span><span class="detail-val">WONDR2 Datacenter (On-Prem)</span></div><div class="detail-row"><span class="detail-key">Platform</span><span class="detail-val">OpenShift</span></div><div class="detail-row"><span class="detail-key">Function</span><span class="detail-val">Central management plane</span></div><div class="section-label">Components</div><div class="component-grid"><div class="component-box">RHACM</div><div class="component-box">Keycloak</div><div class="component-box">Praxis Edge Gateway</div><div class="component-box">MaaS</div><div class="component-box">Consumer Portal UI</div><div class="component-box">Metering System</div></div></div></div>
+
+<!-- Connection panel (body-level, outside transforms) -->
+<div id="connBackdrop" onclick="hideConnView()" style="display: none;"></div>
+<div id="connPanel" style="display: none;">
+  <div style="background:var(--rh-red);padding:14px 18px">
+    <div id="connTitle" style="color:#fff;font-weight:700;font-size:14px">AI Grid Control Plane / Inference Entrypoint Cluster</div>
+    <div id="connSubtitle" style="color:rgba(255,255,255,.7);font-size:11px;margin-top:4px">Select a component to see its connections</div>
+  </div>
+  <div id="connChips" style="padding:14px 16px;display:flex;flex-direction:column;gap:8px"><button class="conn-chip" onclick="event.stopPropagation();selectChip('nd-mgmt',this,'RHACM')">RHACM</button><button class="conn-chip" onclick="event.stopPropagation();selectChip('nd-mgmt',this,'Keycloak')">Keycloak</button><button class="conn-chip" onclick="event.stopPropagation();selectChip('nd-mgmt',this,'Praxis Edge Gateway')">Praxis Edge Gateway</button><button class="conn-chip" onclick="event.stopPropagation();selectChip('nd-mgmt',this,'MaaS')">MaaS</button><button class="conn-chip" onclick="event.stopPropagation();selectChip('nd-mgmt',this,'Consumer Portal UI')">Consumer Portal UI</button><button class="conn-chip" onclick="event.stopPropagation();selectChip('nd-mgmt',this,'Metering System')">Metering System</button></div>
+  <div style="padding:0 16px 14px;text-align:center">
+    <span id="connDetailsLink" style="color:var(--rh-red);font-size:11px;font-weight:600;cursor:pointer;text-decoration:underline">View Details →</span>
+  </div>
+</div>
+<svg id="connSvg" style="display: none;"></svg>
+
+<script>
+function toggleTheme(){
+  var d=document.documentElement;
+  var dark=d.getAttribute('data-theme')==='dark';
+  d.setAttribute('data-theme',dark?'':'dark');
+  localStorage.setItem('theme',dark?'light':'dark');
+  // Re-render flow SVGs if on the flow tab
+  if(curFlow>=0){var btn=document.querySelector('.flow-tab.active');if(btn)selectFlow(curFlow,btn)}
+  // Re-render auth flow SVGs if on the auth tab
+  if(curAuthFlow>=0){var abtn=document.querySelector('.auth-flow-tab.active');if(abtn)selectAuthFlow(curAuthFlow,abtn)}
+  // Update arch-git swatch for dark mode
+  D['arch-git'].c=isDark()?'#a0a4ab':'#1e1e1e';
+}
+(function(){var t=localStorage.getItem('theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark')})();
+
+function switchTab(i){
+  document.querySelectorAll('.tab-btn').forEach(function(b,j){b.classList.toggle('active',j===i)});
+  var sl=document.getElementById('tabSlider');sl.className='tab-slider'+(i>0?' at-'+i:'');
+  if(i!==1)hideConnView();
+  if(i===2)setTimeout(function(){if(!document.getElementById('flowContainer').innerHTML)selectFlow(0,document.querySelector('.flow-tab'))},300);
+  if(i===3)setTimeout(function(){if(!document.getElementById('authFlowContainer').innerHTML)selectAuthFlow(0,document.querySelector('.auth-flow-tab'))},300);
+}
+
+/* ---- Flow rendering ---- */
+var curFlow=-1;
+function selectFlow(idx,btn){
+  if(btn){document.querySelectorAll('.flow-tab').forEach(function(b){b.classList.remove('active')});btn.classList.add('active')}
+  curFlow=idx;
+  var c=document.getElementById('flowContainer');
+  if(idx===0)renderFlow2(c);
+  else renderFlow3(c,0);
+}
+
+function isDark(){return document.documentElement.getAttribute('data-theme')==='dark'}
+function svgNode(x,y,w,h,label,sub,cls){
+  var dk=isDark();
+  var colors={
+    user:['#6c757d',dk?'#282a30':'#f8f9fa'],
+    maas:['#228be6',dk?'#1e2025':'#fff'],
+    llmd:['#e03131',dk?'#1e2025':'#fff'],
+    gw:['#e8590c',dk?'#1e2025':'#fff'],
+    broken:[dk?'#5c6370':'#adb5bd',dk?'#282a30':'#f1f3f5']
+  };
+  var c=colors[cls]||colors.user;
+  var textFill=dk?'#e4e5e7':'#1e1e1e';
+  var subFill=dk?'#a0a4ab':'#6c757d';
+  var s='<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="10" fill="'+c[1]+'" stroke="'+c[0]+'" stroke-width="2"/>';
+  s+='<rect x="'+x+'" y="'+y+'" width="'+w+'" height="10" rx="10" fill="'+c[0]+'"/><rect x="'+x+'" y="'+(y+5)+'" width="'+w+'" height="5" fill="'+c[0]+'"/>';
+  s+='<text x="'+(x+w/2)+'" y="'+(y+h/2+(sub?-4:4))+'" text-anchor="middle" font-size="12" font-weight="700" fill="'+textFill+'" font-family="Segoe UI,system-ui,sans-serif">'+label+'</text>';
+  if(sub)s+='<text x="'+(x+w/2)+'" y="'+(y+h/2+12)+'" text-anchor="middle" font-size="10" fill="'+subFill+'" font-family="Segoe UI,system-ui,sans-serif">'+sub+'</text>';
+  return s;
+}
+function svgArrow(id,path,color,dashed){
+  return '<path id="'+id+'" d="'+path+'" fill="none" stroke="'+color+'" stroke-width="2.6"'+(dashed?' stroke-dasharray="7 4"':'')+' marker-end="url(#fa-'+color.replace('#','')+')" />';
+}
+function svgDot(id,pathId,color,dur,beginRef){
+  return '<circle r="5" fill="'+color+'" opacity="0">'+
+    '<animateMotion id="'+id+'" dur="'+dur+'s" begin="'+beginRef+'" fill="freeze"><mpath href="#'+pathId+'"/></animateMotion>'+
+    '<animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.01;0.9;1" dur="'+dur+'s" begin="'+id+'.begin" fill="freeze"/>'+
+    '</circle>';
+}
+function svgMarker(color){
+  var id='fa-'+color.replace('#','');
+  return '<marker id="'+id+'" markerWidth="12" markerHeight="10" refX="10" refY="5" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0L12 5L0 10z" fill="'+color+'"/></marker>';
+}
+function svgLabel(x,y,text,color){
+  var dk=isDark();
+  var fill=color||(dk?'#a0a4ab':'#495057');
+  var halo=dk?'#1e2025':'#fff';
+  return '<text x="'+x+'" y="'+y+'" text-anchor="middle" font-size="10" fill="'+fill+'" font-weight="600" font-family="Segoe UI,system-ui,sans-serif" style="paint-order:stroke;stroke:'+halo+';stroke-width:3px;stroke-linecap:round;stroke-linejoin:round">'+text+'</text>';
+}
+function flowLegend(){
+  var dk=isDark();
+  var dotA=dk?'#adb5bd':'#868e96',dotB='#e8590c';
+  return '<div class="flow-legend"><div class="flow-legend-item"><svg width="24" height="10"><line x1="0" y1="5" x2="24" y2="5" stroke="#228be6" stroke-width="2"/></svg>Request</div><div class="flow-legend-item"><svg width="24" height="10"><line x1="0" y1="5" x2="24" y2="5" stroke="#2b8a3e" stroke-width="2" stroke-dasharray="4 3"/></svg>Response</div><div class="flow-legend-item"><svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="'+dotA+'"/></svg>User A</div><div class="flow-legend-item"><svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="'+dotB+'"/></svg>User B</div></div>';
+}
+
+function renderFlow2(c){
+  var W=1110,H=195,fwd='#228be6',ret='#2b8a3e',ball='#868e96',mtls='#7048e8';
+  var s='<div class="flow-desc">M6 is served only on RTX-0. The Inference Entrypoint MaaS authenticates and checks quota, then the Praxis Edge Gateway routes the request over mTLS to RTX-0\'s Praxis Provider Gateway, which forwards to RTX-0\'s LLM-D.</div>';
+  s+='<div class="flow-scene"><svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'">';
+  s+='<defs>'+svgMarker(fwd)+svgMarker(ret)+svgMarker(mtls)+'</defs>';
+  s+=svgNode(10,52,95,56,'User App','','user');
+  s+=svgNode(175,40,165,80,'Entrypoint MaaS','Auth + Quota','maas');
+  s+=svgNode(410,40,170,80,'Praxis Edge Gateway','Entrypoint Cluster','gw');
+  s+=svgNode(690,40,185,80,'Praxis Provider Gateway','RTX-0','gw');
+  s+=svgNode(945,40,150,80,'RTX-0 LLM-D','Serves M6','llmd');
+  // Forward
+  s+=svgArrow('f2a','M105,80 L175,80',fwd);
+  s+=svgArrow('f2b','M340,80 L410,80',fwd);
+  s+=svgArrow('f2c','M580,80 L690,80',mtls);
+  s+=svgArrow('f2d','M875,80 L945,80',fwd);
+  // Return
+  s+=svgArrow('f2e','M945,105 L875,105',ret,true);
+  s+=svgArrow('f2f','M690,105 L580,105',ret,true);
+  s+=svgArrow('f2g','M410,105 L340,105',ret,true);
+  s+=svgArrow('f2h','M175,105 L105,105',ret,true);
+  // Labels
+  s+=svgLabel(140,68,'Request M6',fwd);
+  s+=svgLabel(375,68,'Route',fwd);
+  s+=svgLabel(635,68,'mTLS',mtls);
+  s+=svgLabel(910,68,'Route',fwd);
+  s+=svgLabel(140,124,'Response',ret);
+  s+=svgLabel(375,124,'Response',ret);
+  s+=svgLabel(635,124,'Response',ret);
+  s+=svgLabel(910,124,'Response',ret);
+  // Dots
+  s+=svgDot('e2a','f2a',ball,0.6,'0s;e2h.end+1s');
+  s+=svgDot('e2b','f2b',ball,0.6,'e2a.end');
+  s+=svgDot('e2c','f2c',ball,0.7,'e2b.end');
+  s+=svgDot('e2d','f2d',ball,0.6,'e2c.end');
+  s+=svgDot('e2e','f2e',ball,0.6,'e2d.end+0.3s');
+  s+=svgDot('e2f','f2f',ball,0.7,'e2e.end');
+  s+=svgDot('e2g','f2g',ball,0.6,'e2f.end');
+  s+=svgDot('e2h','f2h',ball,0.6,'e2g.end');
+  s+='</svg></div>'+flowLegend();
+  c.innerHTML=s;
+}
+
+function renderFlow3(c,scenario){
+  var W=1185,H=420,fwd='#228be6',ret='#2b8a3e',fail='#e03131',mtls='#7048e8';
+  var ballA='#868e96',ballB='#e8590c';
+  var descs=[
+    'Three sequential requests are sent. The Praxis Edge Gateway keeps routing User A to RTX-0 &mdash; demonstrating session stickiness &mdash; while User B is routed to Azure.',
+    'Request #1 is routed to Azure successfully. Then the Azure link breaks. Requests #2 and #3 are rerouted to RTX-0 instead.'
+  ];
+  var s='<div class="flow-desc">M1 is served on multiple clusters. Requests pass through the Inference Entrypoint MaaS and the Praxis Edge Gateway, which smart-routes over mTLS to a cluster\'s Praxis Provider Gateway and its LLM-D.</div>';
+  s+='<div class="scenario-tabs">';
+  s+='<button class="scenario-tab'+(scenario===0?' active':'')+'" onclick="renderFlow3(document.getElementById(\'flowContainer\'),0)">Session Stickiness</button>';
+  s+='<button class="scenario-tab'+(scenario===1?' active fail':'')+'" onclick="renderFlow3(document.getElementById(\'flowContainer\'),1)">Failover</button>';
+  s+='</div>';
+  s+='<p class="flow-desc" style="margin-top:0">'+descs[scenario]+'</p>';
+  s+='<div class="flow-scene"><svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'">';
+  s+='<defs>'+svgMarker(fwd)+svgMarker(ret)+svgMarker(fail)+svgMarker(mtls)+'</defs>';
+
+  // Users + shared middle (Inference Entrypoint Cluster)
+  s+=svgNode(10,40,95,54,'User A','','user');
+  s+=svgNode(10,300,95,54,'User B','','user');
+  s+=svgNode(215,165,180,90,'Entrypoint MaaS','Auth + Quota','maas');
+  s+=svgNode(465,165,180,90,'Praxis Edge Gateway','Smart Routing','gw');
+
+  // Target clusters
+  s+=svgNode(785,58,185,72,'Praxis Provider GW','RTX-0','gw');
+  s+=svgNode(1020,58,150,72,'RTX-0 LLM-D','Serves M1','llmd');
+  s+=svgNode(785,320,185,72,'Praxis Provider GW','Azure','gw');
+  s+=svgNode(1020,320,150,72,'Azure LLM-D','Serves M1','llmd');
+
+  // Forward shared
+  s+=svgArrow('fA','M105,58 C170,58 165,188 215,188',fwd);
+  s+=svgArrow('fB','M105,318 C170,318 165,232 215,232',fwd);
+  s+=svgArrow('fM','M395,204 L465,204',fwd);
+  // Forward branches (mTLS)
+  s+=svgArrow('fRT','M645,190 C720,190 725,82 785,82',mtls);
+  s+=svgArrow('fRTl','M970,88 L1020,88',fwd);
+  s+=svgArrow('fAZ','M645,230 C720,230 725,344 785,344',mtls);
+  s+=svgArrow('fAZl','M970,350 L1020,350',fwd);
+  // Return shared
+  s+=svgArrow('rM','M465,218 L395,218',ret,true);
+  s+=svgArrow('rA','M215,210 C165,210 170,80 105,80',ret,true);
+  s+=svgArrow('rB','M215,248 C165,248 170,340 105,340',ret,true);
+  // Return branches
+  s+=svgArrow('rRTl','M1020,104 L970,104',ret,true);
+  s+=svgArrow('rRT','M785,106 C725,106 720,214 645,214',ret,true);
+  s+=svgArrow('rAZl','M1020,366 L970,366',ret,true);
+  s+=svgArrow('rAZ','M785,368 C725,368 720,246 645,246',ret,true);
+
+  // Labels
+  s+=svgLabel(430,196,'Route',fwd);
+  s+=svgLabel(713,138,'mTLS',mtls);
+  s+=svgLabel(713,314,'mTLS',mtls);
+
+  if(scenario===0){
+    s+=svgLabel(877,48,'Req #1, #3',fwd);
+    s+=svgLabel(877,410,'Req #2',fwd);
+    // Req#1: User A -> RTX-0
+    s+=svgDot('ds1','fA',ballA,0.6,'0s;ds24.end+1.5s');
+    s+=svgDot('ds2','fM',ballA,0.6,'ds1.end');
+    s+=svgDot('ds3','fRT',ballA,0.7,'ds2.end');
+    s+=svgDot('ds4','fRTl',ballA,0.5,'ds3.end');
+    s+=svgDot('ds5','rRTl',ballA,0.5,'ds4.end+0.2s');
+    s+=svgDot('ds6','rRT',ballA,0.7,'ds5.end');
+    s+=svgDot('ds7','rM',ballA,0.6,'ds6.end');
+    s+=svgDot('ds8','rA',ballA,0.6,'ds7.end');
+    // Req#2: User B -> Azure
+    s+=svgDot('ds9','fB',ballB,0.6,'ds8.end+0.6s');
+    s+=svgDot('ds10','fM',ballB,0.6,'ds9.end');
+    s+=svgDot('ds11','fAZ',ballB,0.7,'ds10.end');
+    s+=svgDot('ds12','fAZl',ballB,0.5,'ds11.end');
+    s+=svgDot('ds13','rAZl',ballB,0.5,'ds12.end+0.2s');
+    s+=svgDot('ds14','rAZ',ballB,0.7,'ds13.end');
+    s+=svgDot('ds15','rM',ballB,0.6,'ds14.end');
+    s+=svgDot('ds16','rB',ballB,0.6,'ds15.end');
+    // Req#3: User A -> RTX-0 again (sticky!)
+    s+=svgDot('ds17','fA',ballA,0.6,'ds16.end+0.6s');
+    s+=svgDot('ds18','fM',ballA,0.6,'ds17.end');
+    s+=svgDot('ds19','fRT',ballA,0.7,'ds18.end');
+    s+=svgDot('ds20','fRTl',ballA,0.5,'ds19.end');
+    s+=svgDot('ds21','rRTl',ballA,0.5,'ds20.end+0.2s');
+    s+=svgDot('ds22','rRT',ballA,0.7,'ds21.end');
+    s+=svgDot('ds23','rM',ballA,0.6,'ds22.end');
+    s+=svgDot('ds24','rA',ballA,0.6,'ds23.end');
+
+  }else{
+    s+=svgLabel(877,48,'Req #2, #3',fwd);
+    s+=svgLabel(877,410,'Req #1',fwd);
+    // Broken X on Azure (bottom) mTLS link after Req#1 returns
+    var cyc='22';
+    s+='<line x1="691" y1="266" x2="739" y2="308" stroke="'+fail+'" stroke-width="3.5" opacity="0"><animate attributeName="opacity" values="0;0;1;1" keyTimes="0;0.33;0.37;1" dur="'+cyc+'s" repeatCount="indefinite"/></line>';
+    s+='<line x1="739" y1="266" x2="691" y2="308" stroke="'+fail+'" stroke-width="3.5" opacity="0"><animate attributeName="opacity" values="0;0;1;1" keyTimes="0;0.33;0.37;1" dur="'+cyc+'s" repeatCount="indefinite"/></line>';
+    s+='<text x="715" y="254" text-anchor="middle" font-size="11" fill="'+fail+'" font-weight="700" font-family="Segoe UI,system-ui,sans-serif" opacity="0"><animate attributeName="opacity" values="0;0;1;1" keyTimes="0;0.33;0.37;1" dur="'+cyc+'s" repeatCount="indefinite"/>\u2718 Azure link broken</text>';
+    // Req#1: User A -> Azure (works)
+    s+=svgDot('df1','fA',ballA,0.6,'0s;df24.end+2s');
+    s+=svgDot('df2','fM',ballA,0.6,'df1.end');
+    s+=svgDot('df3','fAZ',ballA,0.7,'df2.end');
+    s+=svgDot('df4','fAZl',ballA,0.5,'df3.end');
+    s+=svgDot('df5','rAZl',ballA,0.5,'df4.end+0.2s');
+    s+=svgDot('df6','rAZ',ballA,0.7,'df5.end');
+    s+=svgDot('df7','rM',ballA,0.6,'df6.end');
+    s+=svgDot('df8','rA',ballA,0.6,'df7.end');
+    // (Azure breaks here)
+    // Req#2: User B -> RTX-0 (rerouted)
+    s+=svgDot('df9','fB',ballB,0.6,'df8.end+1s');
+    s+=svgDot('df10','fM',ballB,0.6,'df9.end');
+    s+=svgDot('df11','fRT',ballB,0.7,'df10.end');
+    s+=svgDot('df12','fRTl',ballB,0.5,'df11.end');
+    s+=svgDot('df13','rRTl',ballB,0.5,'df12.end+0.2s');
+    s+=svgDot('df14','rRT',ballB,0.7,'df13.end');
+    s+=svgDot('df15','rM',ballB,0.6,'df14.end');
+    s+=svgDot('df16','rB',ballB,0.6,'df15.end');
+    // Req#3: User A -> RTX-0 (also rerouted)
+    s+=svgDot('df17','fA',ballA,0.6,'df16.end+0.6s');
+    s+=svgDot('df18','fM',ballA,0.6,'df17.end');
+    s+=svgDot('df19','fRT',ballA,0.7,'df18.end');
+    s+=svgDot('df20','fRTl',ballA,0.5,'df19.end');
+    s+=svgDot('df21','rRTl',ballA,0.5,'df20.end+0.2s');
+    s+=svgDot('df22','rRT',ballA,0.7,'df21.end');
+    s+=svgDot('df23','rM',ballA,0.6,'df22.end');
+    s+=svgDot('df24','rA',ballA,0.6,'df23.end');
+  }
+
+  s+='</svg></div>'+flowLegend();
+  c.innerHTML=s;
+}
+
+/* ---- Auth / Rate Limiting flow ---- */
+var curAuthFlow=-1;
+function selectAuthFlow(idx,btn){
+  if(btn){document.querySelectorAll('.auth-flow-tab').forEach(function(b){b.classList.remove('active')});btn.classList.add('active')}
+  curAuthFlow=idx;
+  renderAuthFlow(document.getElementById('authFlowContainer'),idx);
+}
+
+function authFlowLegend(){
+  var dk=isDark();
+  var personFill=dk?'#a0a4ab':'#6c757d';
+  var textFill=dk?'#e4e5e7':'#1e1e1e';
+  var mutedFill=dk?'#a0a4ab':'#6c757d';
+  var cardBg=dk?'#1e2025':'#fff';
+  var borderC=dk?'#3a3f47':'#dee2e6';
+  return '<div style="display:flex;gap:16px;margin-top:16px;flex-wrap:wrap">'+
+    '<div style="flex:1;min-width:260px;border:2px solid '+borderC+';border-radius:12px;padding:14px;background:'+cardBg+'">'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'+
+        '<svg viewBox="0 0 24 24" width="20" height="20" fill="'+personFill+'"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>'+
+        '<span style="font-size:12px;font-weight:700;color:'+textFill+'">Grid Admin</span>'+
+      '</div>'+
+      '<div style="font-size:11px;color:'+mutedFill+';line-height:1.5">Configures the <strong>per-tenant aggregate quota</strong> on the Inference Entrypoint MaaS (e.g. 1M tokens/min) across all of the tenant\'s users.</div>'+
+    '</div>'+
+    '<div style="flex:1;min-width:260px;border:2px solid '+borderC+';border-radius:12px;padding:14px;background:'+cardBg+'">'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'+
+        '<svg viewBox="0 0 24 24" width="20" height="20" fill="'+personFill+'"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>'+
+        '<span style="font-size:12px;font-weight:700;color:'+textFill+'">Tenant Admin</span>'+
+      '</div>'+
+      '<div style="font-size:11px;color:'+mutedFill+';line-height:1.5">Configures the <strong>per-user quota</strong> on the Inference Entrypoint MaaS (e.g. 100k tokens/min) and manages user API keys via the Consumer Portal UI.</div>'+
+    '</div>'+
+  '</div>';
+}
+
+function renderAuthFlow(c,scenario){
+  var fwd='#228be6',ret='#2b8a3e',fail='#e03131',ball='#868e96';
+  var dk=isDark();
+  var checkGreen='#2b8a3e',crossRed='#e03131';
+
+  var descs=[
+    'Both quota checks pass at the Inference Entrypoint MaaS. The request is routed over mTLS through the Praxis Edge &amp; Provider Gateways and reaches LLM-D successfully.',
+    'The user has exceeded their per-user token quota (e.g. 100k tokens/min) configured by the <strong>Tenant Admin</strong>. The Inference Entrypoint MaaS rejects the request with 429 before it is routed.',
+    'The user passes their per-user check, but the tenant has exceeded its aggregate quota (e.g. 1M tokens/min) configured by the <strong>Grid Admin</strong>. The Inference Entrypoint MaaS rejects with 429.'
+  ];
+
+  var s='<div class="scenario-tabs" style="margin-bottom:14px">';
+  s+='<button class="auth-flow-tab scenario-tab'+(scenario===0?' active':'')+'" onclick="selectAuthFlow(0,this)">Happy Path</button>';
+  s+='<button class="auth-flow-tab scenario-tab'+(scenario===1?' active fail':'')+'" onclick="selectAuthFlow(1,this)">User Rate Limited</button>';
+  s+='<button class="auth-flow-tab scenario-tab'+(scenario===2?' active fail':'')+'" onclick="selectAuthFlow(2,this)">Tenant Rate Limited</button>';
+  s+='</div>';
+  s+='<p class="flow-desc" style="margin-top:0">'+descs[scenario]+'</p>';
+  var mtls='#7048e8';
+
+  if(scenario===0){
+    // === HAPPY PATH: full chain, both checks pass at the Entrypoint MaaS ===
+    var W=985,H=210;
+    s+='<div class="flow-scene"><svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'">';
+    s+='<defs>'+svgMarker(fwd)+svgMarker(ret)+svgMarker(mtls)+'</defs>';
+    s+=svgNode(15,78,95,52,'User App','','user');
+    s+=svgNode(150,52,180,112,'Entrypoint MaaS','Auth + Quota','maas');
+    s+=svgNode(380,78,165,68,'Praxis Edge Gateway','Smart Routing','gw');
+    s+=svgNode(600,78,175,68,'Praxis Provider Gateway','Provider cluster','gw');
+    s+=svgNode(825,78,140,68,'LLM-D (M1)','Serves M1','llmd');
+
+    // Quota check lines inside the Entrypoint MaaS node
+    s+=svgLabel(240,138,'User: 100k/min '+'\u2714',checkGreen);
+    s+=svgLabel(240,154,'Tenant: 1M/min '+'\u2714',checkGreen);
+
+    // Forward arrows
+    s+=svgArrow('fa0','M110,98 L150,98',fwd);
+    s+=svgArrow('fa1','M330,98 L380,98',fwd);
+    s+=svgArrow('fa2','M545,98 L600,98',mtls);
+    s+=svgArrow('fa3','M775,98 L825,98',fwd);
+    // Return arrows
+    s+=svgArrow('fa4','M825,124 L775,124',ret,true);
+    s+=svgArrow('fa5','M600,124 L545,124',ret,true);
+    s+=svgArrow('fa6','M380,124 L330,124',ret,true);
+    s+=svgArrow('fa7','M150,124 L110,124',ret,true);
+    // Labels
+    s+=svgLabel(130,88,'Request M1',fwd);
+    s+=svgLabel(355,88,'Route',fwd);
+    s+=svgLabel(572,88,'mTLS',mtls);
+    s+=svgLabel(800,88,'Route',fwd);
+    s+=svgLabel(130,140,'Response',ret);
+    s+=svgLabel(355,140,'Response',ret);
+    s+=svgLabel(572,140,'Response',ret);
+    s+=svgLabel(800,140,'Response',ret);
+    // Animated dots - forward
+    s+=svgDot('da0','fa0',ball,0.6,'0s;da7.end+1.5s');
+    s+=svgDot('da1','fa1',ball,0.6,'da0.end');
+    s+=svgDot('da2','fa2',ball,0.7,'da1.end');
+    s+=svgDot('da3','fa3',ball,0.6,'da2.end');
+    // Animated dots - return
+    s+=svgDot('da4','fa4',ball,0.6,'da3.end+0.3s');
+    s+=svgDot('da5','fa5',ball,0.7,'da4.end');
+    s+=svgDot('da6','fa6',ball,0.6,'da5.end');
+    s+=svgDot('da7','fa7',ball,0.6,'da6.end');
+    s+='</svg></div>';
+
+  }else if(scenario===1){
+    // === USER RATE LIMITED: blocked at the Entrypoint MaaS (per-user quota) ===
+    var W=640,H=210;
+    s+='<div class="flow-scene"><svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'">';
+    s+='<defs>'+svgMarker(fwd)+svgMarker(ret)+svgMarker(fail)+'</defs>';
+    s+=svgNode(15,78,95,52,'User App','','user');
+    s+=svgNode(180,52,185,112,'Entrypoint MaaS','Auth + Quota','maas');
+    // Quota check - FAIL
+    s+=svgLabel(272,140,'User: 100k/min '+'\u2718',crossRed);
+    // Forward arrow
+    s+=svgArrow('fu0','M110,98 L180,98',fwd);
+    // Red X block
+    s+='<line x1="430" y1="58" x2="474" y2="102" stroke="'+fail+'" stroke-width="4"/>';
+    s+='<line x1="474" y1="58" x2="430" y2="102" stroke="'+fail+'" stroke-width="4"/>';
+    s+='<text x="496" y="76" font-size="14" fill="'+fail+'" font-weight="700" font-family="Segoe UI,system-ui,sans-serif">429</text>';
+    s+='<text x="496" y="94" font-size="11" fill="'+fail+'" font-weight="600" font-family="Segoe UI,system-ui,sans-serif">Rate Limited</text>';
+    // Return arrow (rejection)
+    s+=svgArrow('fu1','M180,124 L110,124',fail,true);
+    s+=svgLabel(145,88,'Request M1',fwd);
+    s+=svgLabel(145,140,'429 Rejected',fail);
+    // Animated dots
+    s+=svgDot('du0','fu0',ball,0.7,'0s;du1.end+2s');
+    s+=svgDot('du1','fu1',fail,0.7,'du0.end+0.5s');
+    s+='</svg></div>';
+
+  }else{
+    // === TENANT RATE LIMITED: per-user passes, tenant aggregate fails at the Entrypoint MaaS ===
+    var W=640,H=210;
+    s+='<div class="flow-scene"><svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'">';
+    s+='<defs>'+svgMarker(fwd)+svgMarker(ret)+svgMarker(fail)+'</defs>';
+    s+=svgNode(15,78,95,52,'User App','','user');
+    s+=svgNode(180,52,185,112,'Entrypoint MaaS','Auth + Quota','maas');
+    // Quota checks
+    s+=svgLabel(272,138,'User: 100k/min '+'\u2714',checkGreen);
+    s+=svgLabel(272,154,'Tenant: 1M/min '+'\u2718',crossRed);
+    // Forward arrow
+    s+=svgArrow('ft0','M110,98 L180,98',fwd);
+    // Red X block
+    s+='<line x1="430" y1="58" x2="474" y2="102" stroke="'+fail+'" stroke-width="4"/>';
+    s+='<line x1="474" y1="58" x2="430" y2="102" stroke="'+fail+'" stroke-width="4"/>';
+    s+='<text x="496" y="76" font-size="14" fill="'+fail+'" font-weight="700" font-family="Segoe UI,system-ui,sans-serif">429</text>';
+    s+='<text x="496" y="94" font-size="11" fill="'+fail+'" font-weight="600" font-family="Segoe UI,system-ui,sans-serif">Rate Limited</text>';
+    // Return arrow (rejection)
+    s+=svgArrow('ft1','M180,124 L110,124',fail,true);
+    s+=svgLabel(145,88,'Request M1',fwd);
+    s+=svgLabel(145,140,'429 Rejected',fail);
+    // Animated dots
+    s+=svgDot('dt0','ft0',ball,0.7,'0s;dt1.end+2s');
+    s+=svgDot('dt1','ft1',fail,0.7,'dt0.end+0.5s');
+    s+='</svg></div>';
+  }
+
+  s+=authFlowLegend();
+  c.innerHTML=s;
+}
+
+/* ---- Connection view ---- */
+var CONNS={
+  'nd-mgmt':{
+    label:'AI Grid Control Plane / Inference Entrypoint Cluster',
+    info:'arch-mgmt',
+    components:{
+      'RHACM':{targets:[
+        {id:'nd-git',label:'Source of Truth (GitOps)'},
+        {id:'nd-aws',label:'Configures / Deploys'},
+        {id:'nd-azure',label:'Configures / Deploys'},
+        {id:'nd-l40',label:'Configures / Deploys'},
+        {id:'nd-l41',label:'Configures / Deploys'},
+        {id:'nd-rtx0',label:'Configures / Deploys'}
+      ]},
+      'Keycloak':{targets:[
+        {id:'nd-aws',label:'Provides Auth'},
+        {id:'nd-azure',label:'Provides Auth'},
+        {id:'nd-l40',label:'Provides Auth'},
+        {id:'nd-l41',label:'Provides Auth'},
+        {id:'nd-rtx0',label:'Provides Auth'}
+      ]},
+      'Praxis Edge Gateway':{targets:[
+        {id:'nd-aws',label:'Routes to M1, M2'},
+        {id:'nd-azure',label:'Routes to M1, M3'},
+        {id:'nd-l40',label:'Routes to M1, M4'},
+        {id:'nd-l41',label:'Routes to M1, M5'},
+        {id:'nd-rtx0',label:'Routes to M1, M6'}
+      ]},
+      'MaaS':{targets:[
+        {id:'nd-llmd-gw',label:'Exposes'}
+      ]},
+      'Consumer Portal UI':{targets:[
+        {id:'nd-mgmt-maas',label:'Self-service access to'}
+      ]},
+      'Metering System':{targets:[
+        {id:'nd-aws-maas',label:'Receives metering from'},
+        {id:'nd-azure-maas',label:'Receives metering from'},
+        {id:'nd-l40-maas',label:'Receives metering from'},
+        {id:'nd-l41-maas',label:'Receives metering from'},
+        {id:'nd-rtx0-maas',label:'Receives metering from'}
+      ]}
+    }
+  },
+  'nd-aws':{
+    label:'Inference Cluster #1 (AWS)',
+    info:'arch-inf1',
+    components:{
+      'RHOAI':{targets:[{id:'nd-mgmt',label:'Managed by'}]},
+      'Praxis Provider Gateway':{targets:[{id:'nd-aws-llmd',label:'Exposes M1, M2'}]},
+      'LLMD':{targets:[{id:'nd-aws-m1',label:'Runs'},{id:'nd-aws-m2',label:'Runs'}]}
+    }
+  },
+  'nd-azure':{
+    label:'Inference Cluster #2 (Azure)',
+    info:'arch-inf2',
+    components:{
+      'RHOAI':{targets:[{id:'nd-mgmt',label:'Managed by'}]},
+      'Praxis Provider Gateway':{targets:[{id:'nd-azure-llmd',label:'Exposes M1, M3'}]},
+      'LLMD':{targets:[{id:'nd-azure-m1',label:'Runs'},{id:'nd-azure-m3',label:'Runs'}]}
+    }
+  },
+  'nd-l40':{
+    label:'Inference Cluster L4-0',
+    info:'arch-l40',
+    components:{
+      'RHOAI':{targets:[{id:'nd-mgmt',label:'Managed by'}]},
+      'Praxis Provider Gateway':{targets:[{id:'nd-l40-llmd',label:'Exposes M1, M4'}]},
+      'LLMD':{targets:[{id:'nd-l40-m1',label:'Runs'},{id:'nd-l40-m4',label:'Runs'}]}
+    }
+  },
+  'nd-l41':{
+    label:'Inference Cluster L4-1',
+    info:'arch-l41',
+    components:{
+      'RHOAI':{targets:[{id:'nd-mgmt',label:'Managed by'}]},
+      'Praxis Provider Gateway':{targets:[{id:'nd-l41-llmd',label:'Exposes M1, M5'}]},
+      'LLMD':{targets:[{id:'nd-l41-m1',label:'Runs'},{id:'nd-l41-m5',label:'Runs'}]}
+    }
+  },
+  'nd-rtx0':{
+    label:'Inference Cluster RTX-0',
+    info:'arch-rtx0',
+    components:{
+      'RHOAI':{targets:[{id:'nd-mgmt',label:'Managed by'}]},
+      'MaaS':{targets:[{id:'nd-rtx0-llmd',label:'Exposes M1, M6'}]},
+      'LLMD':{targets:[{id:'nd-rtx0-m1',label:'Runs'},{id:'nd-rtx0-m6',label:'Runs'}]}
+    }
+  },
+  'nd-t1':{
+    label:'Tenant 1 Cluster',
+    info:'arch-tenant1',
+    components:{
+      'RHOAI':{targets:[{id:'nd-mgmt',label:'Managed by'}]},
+      'MaaS':{targets:[
+        {id:'nd-t1-llmd',label:'Exposes M5'},
+        {id:'nd-mgmt-maas',label:'Connects to M1 via'},
+        {id:'nd-rtx0-maas',label:'Connects to M6 via'}
+      ]},
+      'LLMD':{targets:[{id:'nd-t1-m5',label:'Runs'}]}
+    }
+  },
+  'nd-t2':{
+    label:'Tenant 2 Cluster',
+    info:'arch-tenant2',
+    components:{
+      'RHOAI':{targets:[{id:'nd-mgmt',label:'Managed by'}]},
+      'MaaS':{targets:[
+        {id:'nd-mgmt-maas',label:'Connects to M1 via'},
+        {id:'nd-l40-maas',label:'Connects to M4 via'},
+        {id:'nd-l41-maas',label:'Connects to M5 via'}
+      ]}
+    }
+  },
+  'persona-admin':{
+    label:'AI Grid Admin',
+    desc:'Owns the platform, deploys the infrastructure, configures it and manages it.',
+    targets:[
+      {id:'nd-git',label:'Describes IaaC and CaaC'},
+      {id:'nd-mgmt',label:'Manages and Controls'},
+      {id:'nd-inf-clusters',label:'Manages and Controls'},
+      {id:'nd-aws',label:'Manages and Controls'},
+      {id:'nd-azure',label:'Manages and Controls'}
+    ]
+  },
+  'persona-tadmin':{
+    label:'Tenant Admin',
+    desc:'Handles tenant onboarding and requests tenant resources via the Consumer Portal UI.',
+    targets:[
+      {id:'nd-consumer-portal',label:'Onboarding & resource requests'}
+    ]
+  },
+  'persona-tuser':{
+    label:'Tenant Users',
+    desc:'Get API keys from the Consumer Portal UI and run inference requests through the MaaS in the Inference Entrypoint Cluster.',
+    targets:[
+      {id:'nd-mgmt-maas',label:'Inference requests'},
+      {id:'nd-consumer-portal',label:'Gets API keys'}
+    ]
+  }
+};
+var connActive=false;
+var connCurrentTargets=null;
+window.addEventListener('scroll',function(){if(connActive&&connCurrentTargets)drawConnArrows(connCurrentTargets)},true);
+window.addEventListener('resize',function(){if(connActive&&connCurrentTargets)drawConnArrows(connCurrentTargets)});
+
+function showConnView(srcId){
+  var conn=CONNS[srcId];if(!conn)return;
+  connActive=srcId;
+  document.getElementById('connTitle').textContent=conn.label;
+  var subtitle=document.getElementById('connSubtitle');
+
+  if(conn.targets){
+    // Direct targets (personas) - draw arrows immediately
+    subtitle.textContent='';
+    document.getElementById('connChips').innerHTML=conn.desc?'<div style="font-size:11px;color:var(--text-muted);line-height:1.5">'+conn.desc+'</div>':'';
+    document.getElementById('connDetailsLink').textContent='';
+    document.getElementById('connBackdrop').style.display='block';
+    document.getElementById('connPanel').style.display='block';
+    document.getElementById('connSvg').style.display='block';
+    connCurrentTargets=conn.targets;
+    drawConnArrows(conn.targets);
+    return;
+  }
+
+  // Component-based (clusters)
+  subtitle.textContent='Select a component to see its connections';
+  var html='';
+  Object.keys(conn.components).forEach(function(name){
+    html+='<button class="conn-chip" onclick="event.stopPropagation();selectChip(\''+srcId+'\',this,\''+name+'\')">'+name+'</button>';
+  });
+  document.getElementById('connChips').innerHTML=html;
+  document.getElementById('connDetailsLink').textContent='View Details \u2192';
+  document.getElementById('connDetailsLink').onclick=function(){hideConnView();showInfo(conn.info)};
+  document.getElementById('connBackdrop').style.display='block';
+  document.getElementById('connPanel').style.display='block';
+  document.getElementById('connSvg').style.display='block';
+  document.getElementById('connSvg').innerHTML='<defs><marker id="cah" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0 0L10 4L0 8z" fill="#e03131"/></marker></defs>';
+}
+
+function selectChip(srcId,btn,chipName){
+  var conn=CONNS[srcId];if(!conn)return;
+  var comp=conn.components[chipName];if(!comp)return;
+  document.querySelectorAll('.conn-chip').forEach(function(b){b.classList.remove('active')});
+  btn.classList.add('active');
+  connCurrentTargets=comp.targets;
+  drawConnArrows(comp.targets);
+}
+
+function drawConnArrows(targets){
+  var svg=document.getElementById('connSvg');
+  var panel=document.getElementById('connPanel');
+  if(!svg||!panel)return;
+  var pr=panel.getBoundingClientRect();
+  var activeBtn=document.querySelector('.conn-chip.active');
+  var ox=pr.right+4;
+  var oy=activeBtn?activeBtn.getBoundingClientRect().top+activeBtn.getBoundingClientRect().height/2:pr.top+pr.height/2;
+
+  var dk=isDark(),cr='#e03131',crl=dk?'#ff6b6b':'#e03131';
+  var pillBg=dk?'#1e2025':'#fff';
+  var s='<defs><marker id="cah" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0 0L10 4L0 8z" fill="'+cr+'"/></marker></defs>';
+
+  // Collect arrow data and group by label
+  var groups={},order=[];
+  targets.forEach(function(t){
+    var el=document.getElementById(t.id);if(!el)return;
+    var r=el.getBoundingClientRect();
+    if(!groups[t.label]){groups[t.label]=[];order.push(t.label);}
+    groups[t.label].push({tx:r.left,ty:r.top+r.height/2,r:r});
+  });
+
+  // Build group data: pill dimensions + fork-point Y
+  var gArr=[];
+  order.forEach(function(label){
+    var pts=groups[label];
+    var avgTy=0;pts.forEach(function(p){avgTy+=p.ty});avgTy/=pts.length;
+    var pillW=label.length*6.2+20,pillH=22;
+    var forkY=oy+(avgTy-oy)*0.25;
+    gArr.push({label:label,pts:pts,pillW:pillW,pillH:pillH,forkY:forkY});
+  });
+
+  // Space fork-points vertically to avoid pill overlap (min 28px)
+  gArr.sort(function(a,b){return a.forkY-b.forkY});
+  for(var i=1;i<gArr.length;i++){if(gArr[i].forkY-gArr[i-1].forkY<28)gArr[i].forkY=gArr[i-1].forkY+28;}
+
+  // Draw each group: trunk -> pill -> forking branches
+  gArr.forEach(function(g){
+    var trunkGap=30;
+    var pillL=ox+trunkGap,pillR=pillL+g.pillW,pillCx=pillL+g.pillW/2;
+
+    // Trunk: short straight line from origin to pill left edge
+    s+='<line x1="'+ox+'" y1="'+oy+'" x2="'+pillL+'" y2="'+g.forkY+'" stroke="'+cr+'" stroke-width="2.5"/>';
+
+    // Label pill
+    s+='<rect x="'+pillL+'" y="'+(g.forkY-g.pillH/2)+'" width="'+g.pillW+'" height="'+g.pillH+'" rx="8" fill="'+pillBg+'" stroke="'+cr+'" stroke-width="1.5"/>';
+    s+='<text x="'+pillCx+'" y="'+(g.forkY+4)+'" text-anchor="middle" font-size="10.5" fill="'+crl+'" font-weight="700" font-family="Segoe UI,system-ui,sans-serif">'+g.label+'</text>';
+
+    // Branches: curved arrows from pill right edge to each target
+    g.pts.forEach(function(d){
+      var bx1=pillR,by1=g.forkY,bx2=d.tx,by2=d.ty;
+      var cpOff=Math.min(Math.abs(bx2-bx1)*0.4,120);
+      s+='<path d="M'+bx1+' '+by1+' C'+(bx1+cpOff)+' '+by1+' '+(bx2-cpOff)+' '+by2+' '+bx2+' '+by2+'" stroke="'+cr+'" stroke-width="2" fill="none" marker-end="url(#cah)"/>';
+      s+='<rect x="'+(d.r.left-5)+'" y="'+(d.r.top-5)+'" width="'+(d.r.width+10)+'" height="'+(d.r.height+10)+'" rx="14" fill="none" stroke="'+cr+'" stroke-width="2.5" opacity="0.5"/>';
+    });
+  });
+
+  svg.innerHTML=s;
+}
+
+function hideConnView(){
+  if(!connActive)return;
+  connActive=false;
+  connCurrentTargets=null;
+  document.getElementById('connBackdrop').style.display='none';
+  document.getElementById('connPanel').style.display='none';
+  document.getElementById('connSvg').style.display='none';
+  document.getElementById('connSvg').innerHTML='';
+}
+
+var D={
+  'aws-region':{t:'AWS US-EAST Region',c:'#ff9900',d:[['Provider','Amazon Web Services'],['Region','us-east-1'],['Purpose','Cloud-based inference']],comp:[{n:'GPU Operator + Configuration'},{n:'RHOAI'},{n:'LLM-D / vLLM workloads'},{n:'Praxis Provider Gateway'}]},
+  'aws-inf1':{t:'AWS Inference Cluster 1',c:'#ff9900',d:[['Provider','AWS'],['Region','us-east-1'],['Platform','OpenShift']],comp:[{n:'GPU Operator + Configuration'},{n:'RHOAI'},{n:'LLM-D / vLLM workloads'},{n:'Praxis Provider Gateway'}]},
+  'azure-region':{t:'Azure US-WEST Region',c:'#0078d4',d:[['Provider','Microsoft Azure'],['Region','westus2'],['Purpose','Cloud-based inference']],comp:[{n:'GPU Operator + Configuration'},{n:'RHOAI'},{n:'LLM-D / vLLM workloads'},{n:'Praxis Provider Gateway'}]},
+  'azure-inf1':{t:'Azure Inference Cluster 1',c:'#0078d4',d:[['Provider','Azure'],['Region','westus2'],['Platform','OpenShift']],comp:[{n:'GPU Operator + Configuration'},{n:'RHOAI'},{n:'LLM-D / vLLM workloads'},{n:'Praxis Provider Gateway'}]},
+  'hub':{t:'Hub Cluster / AI Grid Control Plane',c:'#db212f',d:[['Location','WONDR2 Datacenter (On-Prem)'],['Role','Control Plane / Hub'],['Platform','OpenShift']],comp:[{n:'RHOAI'},{n:'MaaS'},{n:'Praxis Edge Gateway'},{n:'RHACM / MCE'},{n:'Keycloak'}]},
+  'l4-0':{t:'Inference Cluster L4-0',c:'#db212f',d:[['Location','WONDR2 (On-Prem)'],['GPU','NVIDIA L4'],['Platform','OpenShift']],comp:[{n:'GPU Operator + Configuration'},{n:'RHOAI'},{n:'LLM-D / vLLM workloads'},{n:'Praxis Provider Gateway'}]},
+  'l4-1':{t:'Inference Cluster L4-1',c:'#db212f',d:[['Location','WONDR2 (On-Prem)'],['GPU','NVIDIA L4'],['Platform','OpenShift']],comp:[{n:'GPU Operator + Configuration'},{n:'RHOAI'},{n:'LLM-D / vLLM workloads'},{n:'Praxis Provider Gateway'}]},
+  'rtx-0':{t:'Inference Cluster RTX-0',c:'#db212f',d:[['Location','WONDR2 (On-Prem)'],['GPU','NVIDIA RTX 4000 PRO'],['Platform','OpenShift']],comp:[{n:'GPU Operator + Configuration'},{n:'RHOAI'},{n:'LLM-D / vLLM workloads'},{n:'Praxis Provider Gateway'}]},
+  'arch-git':{t:'Git Repository',c:'#1e1e1e',d:[['Role','Source of Truth'],['Contains','IaaC + CaaC']],comp:[]},
+  'arch-mgmt':{t:'AI Grid Control Plane / Inference Entrypoint Cluster',c:'#e03131',d:[['Location','WONDR2 Datacenter (On-Prem)'],['Platform','OpenShift'],['Function','Central management plane']],comp:[{n:'RHACM'},{n:'Keycloak'},{n:'Praxis Edge Gateway'},{n:'MaaS'},{n:'Consumer Portal UI'},{n:'Metering System'}]},
+  'arch-inf1':{t:'Inference Cluster #1 (AWS)',c:'#ff9900',d:[['Provider','Amazon Web Services'],['Type','Inference'],['Models','M1, M2']],comp:[{n:'RHOAI'},{n:'Praxis Provider Gateway'},{n:'LLM-D (M1, M2)'}]},
+  'arch-inf2':{t:'Inference Cluster #2 (Azure)',c:'#0078d4',d:[['Provider','Microsoft Azure'],['Type','Inference'],['Models','M1, M3']],comp:[{n:'RHOAI'},{n:'Praxis Provider Gateway'},{n:'LLM-D (M1, M3)'}]},
+  'arch-l40':{t:'Inference Cluster L4-0',c:'#db212f',d:[['Location','WONDR2 (On-Prem)'],['GPU','NVIDIA L4'],['Models','M1, M4']],comp:[{n:'RHOAI'},{n:'Praxis Provider Gateway'},{n:'LLM-D (M1, M4)'}]},
+  'arch-l41':{t:'Inference Cluster L4-1',c:'#db212f',d:[['Location','WONDR2 (On-Prem)'],['GPU','NVIDIA L4'],['Models','M1, M5']],comp:[{n:'RHOAI'},{n:'Praxis Provider Gateway'},{n:'LLM-D (M1, M5)'}]},
+  'arch-rtx0':{t:'Inference Cluster RTX-0',c:'#db212f',d:[['Location','WONDR2 (On-Prem)'],['GPU','NVIDIA RTX 4000 PRO'],['Models','M1, M6']],comp:[{n:'RHOAI'},{n:'Praxis Provider Gateway'},{n:'LLM-D (M1, M6)'}]},
+  'arch-tenant1':{t:'Tenant 1 Cluster',c:'#6c3483',d:[['Location','WONDR2 (On-Prem)'],['Models','M5']],comp:[{n:'RHOAI'},{n:'MaaS'},{n:'LLM-D (M5)'}]},
+  'arch-tenant2':{t:'Tenant 2 Cluster',c:'#6c3483',d:[['Location','WONDR2 (On-Prem)']],comp:[{n:'RHOAI'},{n:'MaaS'}]}
+};
+
+function rc(c){if(!c||!c.length)return '';return '<div class="section-label">Components</div><div class="component-grid">'+c.map(function(x){return '<div class="component-box'+(x.o?' optional':'')+'">'+x.n+'</div>'}).join('')+'</div>'}
+function showInfo(id){var d=D[id];if(!d)return;document.querySelectorAll('.cluster-node.active').forEach(function(n){n.classList.remove('active')});var node=document.querySelector('[data-id="'+id+'"]');if(node)node.classList.add('active');document.getElementById('infoTitle').innerHTML='<span style="width:14px;height:14px;border-radius:4px;background:'+d.c+';display:inline-block;flex-shrink:0"></span> '+d.t;var h=d.d.map(function(r){return '<div class="detail-row"><span class="detail-key">'+r[0]+'</span><span class="detail-val">'+r[1]+'</span></div>'}).join('');document.getElementById('infoBody').innerHTML=h+rc(d.comp);document.getElementById('modalBackdrop').classList.add('visible');document.getElementById('infoPanel').classList.add('visible')}
+function hideInfo(){document.getElementById('infoPanel').classList.remove('visible');document.getElementById('modalBackdrop').classList.remove('visible');document.querySelectorAll('.cluster-node.active').forEach(function(n){n.classList.remove('active')})}
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){if(connActive)hideConnView();else hideInfo()}});
+</script>
+
+
+</body></html>

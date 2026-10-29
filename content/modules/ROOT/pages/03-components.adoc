@@ -1,0 +1,281 @@
+= Components
+
+This page is the component reference for {aigrid}: what runs in a grid, what each piece is responsible for, and the custom resources that describe a grid.
+
+== Component Map
+
+A grid is built from four groups of components. The first two are the grid itself. The last two are the platform it runs on and the services that make it consumable.
+
+[cols="1,2,3", options="header"]
+|===
+| Group | Components | Role
+
+| *Grid control plane*
+| {agn-short} Operator
+| Watches the grid custom resources, exchanges state with peer sites, scores candidates, and publishes routing overlays. Never on the request path.
+
+| *Grid data plane*
+| {gateway} (edge, consumer and provider roles), external processor, proxy and filter runtime, proxy engine
+| Terminates client traffic, authenticates and parses requests, selects a candidate from the accepted overlay, performs the authenticated gateway-to-gateway hop, injects backend credentials, and proxies to the model.
+
+| *Platform*
+| {ocp-short}, {rhoai-short}, multi-cluster management ({acm-short}), GitOps, GPU operator and node configuration
+| Provides the clusters, the GPU capacity, and the mechanism that installs and keeps the grid components consistent across every site.
+
+| *Serving and consumption*
+| Serving runtime (llm-d / vLLM), {maas-short} (API, subscriptions, policies), identity provider, self-service portal, aggregated monitoring
+| Runs the models, governs who can call them and at which quota, lets users manage their own keys, and reports usage.
+|===
+
+== Grid Control Plane
+
+=== AGN Operator
+
+One operator per site. Its responsibilities:
+
+* Watch the grid custom resources in its own cluster
+* Validate provider placement, status and Secret references
+* Record local provider state and exchange it with peer sites
+* Merge remote state into a local view
+* Apply access policy and scoring for the gateways it serves
+* Render a scoped, versioned routing overlay per gateway reference and apply it as a ConfigMap
+* Report the rendered revision and the last successfully distributed revision separately
+* Manage control-plane trust material, including generating a site CA and site certificates
+
+Each operator renders from its own local view of the world:
+
+----
+local Kubernetes custom resources
++ local observed provider/site status
++ remote provider/site state received from peers
+= this operator's local routing view
+----
+
+=== Control-Plane Resources
+
+The control plane uses cluster-scoped custom resources.
+
+[cols="1,3", options="header"]
+|===
+| Resource | Role
+
+| `GridNetwork`
+| Defines a logical grid network: peer seeds, TLS settings, gateway references, and optional consumer config generation.
+
+| `GridSite`
+| Represents one participating site or cluster. Tracks discovery, gateway address, public trust material, fingerprint trust and phase.
+
+| `InferenceProvider`
+| Declares model capacity: model name, backend kind, endpoint, health configuration, auth strategy, access policy and provider status. This is the resource that makes a model routable in the grid.
+
+| `AgentToolProvider`
+| Declares an MCP endpoint, discovers its tools, distributes tool state, and publishes tool discovery candidates.
+|===
+
+[NOTE]
+====
+*Maturity differs per routed surface.* Inference is the most mature reconciled and routed path.
+
+`AgentToolProvider` has a running reconciler that resolves site selector matches and probes the endpoint's MCP `tools/list` contract, and publishes tool candidates in routing overlays. That is a *discovery and overlay contract*, not a complete MCP data-plane installation path: the operator-generated consumer configuration stays model-oriented, so a deployment that executes MCP calls has to supply its own MCP-capable pipeline and a reachable load-balancer cluster for every tool candidate.
+
+An agent-to-agent resource type exists as schema direction, but no controller runs for it.
+====
+
+=== How a Provider Becomes Routable
+
+A backend does not become routable the moment it starts. It goes through stages:
+
+----
+Provider site declares an InferenceProvider
+  -> local AGN Operator validates placement, status and Secret references
+  -> local provider state is recorded as shared state
+  -> gossip carries that state to peer AGN Operators
+  -> peers merge the shared state into their local view
+  -> each operator applies access policy and scoring for its own gateways
+  -> each operator publishes a scoped, versioned overlay for its own gateways
+----
+
+== State Distribution
+
+Two mechanisms work together, and they answer different questions.
+
+[cols="1,1,3", options="header"]
+|===
+| Mechanism | Question it answers | Notes
+
+| Membership gossip (SWIM)
+| Which peer {agn-short} operators are alive?
+| Uses a Rust SWIM implementation (`foca`). It took the Go `memberlist` model as a reference architecture but does not use `memberlist` itself.
+
+| Shared state (CRDT)
+| What provider and site state has each peer advertised?
+| Conflict-free replicated state, merged into each operator's local view.
+|===
+
+[IMPORTANT]
+====
+*Neither mechanism is an authorization engine.* Discovery alone does not make a site routable. A provider still has to pass lifecycle, trust, freshness, placement and access-policy checks before it enters a gateway overlay.
+
+Gossip encryption proves membership in the shared key group. Stronger sender and origin binding is still hardening work, so distributed state should not be treated as fully security-sensitive routing input yet.
+====
+
+== Routing Overlays
+
+For each gateway reference on a `GridNetwork`, the operator writes a ConfigMap with two representations of the same routing state:
+
+* `routing-overlay.json` is the versioned envelope, consumed by gateways that enforce the observable overlay contract.
+* `routing-config.json` is the bare routing payload, retained for consumers that have not enabled the envelope contract.
+
+The versioned envelope contains a schema version, a content-addressed semantic revision with a matching SHA-256 content digest, scope binding for the network, gateway, namespace and local site, bounded producer and network provenance, and the routing payload.
+
+The routing payload contains the local site name for that gateway, candidate model and provider entries, candidate site and cluster identities, freshness and ordering information, and optional credential references.
+
+Credential references carry locating information only:
+
+----
+strategy + Secret name + namespace + key
+----
+
+[WARNING]
+====
+Token bytes are never written into overlays, generated ConfigMaps, status or logs. The control plane validates the Secret reference and projects *only the reference*. It never copies Secret values across clusters.
+====
+
+The revision is content-addressed and covers only routing-relevant content, so a timestamp or provenance update does not create a new routing revision.
+
+The gateway validates the schema, digest, scope, provenance and candidate bounds before accepting an envelope. An invalid cold-start overlay prevents the gateway from becoming ready. An invalid replacement does not displace the in-memory last-known-good snapshot.
+
+=== Revision Lifecycle
+
+Four distinct terms, and conflating them is the most common source of confusion when a routing change "did not apply":
+
+[cols="1,3", options="header"]
+|===
+| Stage | Meaning
+
+| *Rendered*
+| {agn-short} produced a valid envelope and semantic revision.
+
+| *Distributed*
+| Kubernetes accepted the overlay ConfigMap. {agn-short} records its `resourceVersion`.
+
+| *Accepted*
+| The gateway validated the envelope and installed its immutable in-memory snapshot.
+
+| *Serving*
+| A request selected a route from that exact accepted snapshot.
+|===
+
+An applied ConfigMap alone is not proof that the gateway accepted its newest revision. If an apply fails, status preserves the last distributed revision while reporting the new render attempt. A ConfigMap annotation exposes schema, revision and digest, so you can check without parsing the data.
+
+The gateway emits the accepted revision when it loads an overlay. For provider-bound requests, the edge also carries the serving revision in bounded provider-hop context; the provider gateway consumes and removes that edge-owned header, then writes a provider-owned revision header for backend telemetry.
+
+NOTE: Neither revision header grants authority. mTLS peer identity and provider-local candidate, model and path policy remain the authorization boundary.
+
+=== Overlay Handoff
+
+Rendering a ConfigMap is not enough by itself. Kubernetes can project the new file into a pod, but the running gateway still has to consume it. The recommended handoff uses an overlay sync container:
+
+----
+AGN Operator
+  -> applies a scoped, content-addressed overlay ConfigMap
+Kubernetes API watch
+  -> overlay-sync receives the new resource version
+overlay-sync
+  -> validates size, schema, scope, revision and digest
+  -> atomically replaces the file in a shared emptyDir
+AI Gateway
+  -> observes the file change and hot-reloads the accepted snapshot
+----
+
+Gateway hot reload is already fast once the file changes. The sidecar exists because a directly projected ConfigMap is refreshed by the kubelet on an eventual schedule, and that delay has been observed to be long enough for a temporary routing preference to change and recover before the gateway saw either update. Watching the Kubernetes API removes that projected-volume delay from the normal path. The sidecar does not make the operator reconcile more frequently.
+
+[cols="1,3", options="header"]
+|===
+| Owner | Responsibility
+
+| {agn-short} Operator
+| Render a content-addressed envelope, apply the consumer ConfigMap, and report rendered and distributed revisions.
+
+| Overlay sync init container
+| Wait for the first valid operator overlay, validate it, and write it before the gateway starts.
+
+| Overlay sync sidecar
+| Watch one named ConfigMap, reject invalid replacements, atomically write valid revisions, retain the last-known-good file, and report delivery health.
+
+| {gateway}
+| Strictly validate the projected envelope and atomically replace the accepted in-memory routing snapshot.
+
+| Deployment owner
+| Configure expected scope, sidecar image, reload policy, and monitoring for distributed, written, accepted and serving revisions.
+|===
+
+The sidecar is also a deliberate security boundary. A dedicated ServiceAccount receives namespaced `get`, `list` and `watch` access for the configured overlay ConfigMap, and only the init and sidecar containers mount its projected token. The gateway container mounts the resulting overlay directory read-only and receives *no* Kubernetes API credential.
+
+Direct ConfigMap projection remains an opt-out compatibility mode. It has fewer moving parts, but delivery latency is controlled by the kubelet and you lose sidecar validation, last-known-good behaviour and delivery-status metrics.
+
+Transport configuration changes, such as moving a remote endpoint from plaintext to mutual TLS or updating the TLS SNI, require the deployment owner to make sure the gateway reloads that configuration.
+
+== Scoring and Selection
+
+The control plane applies one provider-level scoring strategy before writing the overlay.
+
+[cols="1,3", options="header"]
+|===
+| Strategy | Behaviour
+
+| `noMetrics`
+| Generic default for external APIs and providers without comparable telemetry. All admitted candidates get the same dynamic score.
+
+| `queueDepth`
+| Prefers the shortest normalized queue. Available to llm-d pools.
+
+| `kvCachePressure`
+| Prefers the most available KV-cache capacity. Available to llm-d pools.
+|===
+
+Unavailable providers are excluded. Stale or degraded candidates can stay in the overlay as lower-preference fallbacks.
+
+Two scoring boundaries are worth remembering:
+
+* *No request-specific prefix scoring in the control plane.* That needs the current request and per-endpoint cache state, so it stays inside the llm-d endpoint picker after the control plane has selected the provider pool.
+* *The gateway does not recompute the score.* At request time `intelligent_route` consumes the loaded overlay, matches the requested model or tool against the already-loaded candidate set, and chooses the best candidate under its request-time rules.
+
+== Serving and Consumption Components
+
+These are the components a provider and a tenant actually interact with.
+
+[cols="1,3", options="header"]
+|===
+| Component | Role
+
+| Serving runtime (llm-d / vLLM)
+| Runs the models on GPU nodes at each site. Model images come from a registry the provider controls, or from a persistent volume the provider configures.
+
+| {maas-short} platform
+| Governs access to models: the API that mints and validates keys, subscriptions that define model access and quota, and the gateway policies that enforce both.
+
+| Identity provider
+| Authenticates tenant users. A tenant with a corporate IdP can be federated in, so the tenant keeps managing its own users and groups, with group claims mapped to the groups that drive subscription and model access.
+
+| Self-service portal
+| Lets a tenant user sign in without cluster access to list the models and endpoints their subscription grants, view their subscriptions and limits, manage their own API keys, and see their own usage. The model list covers all sites, not only the local cluster.
+
+| Aggregated monitoring
+| Collects metrics from all sites into a hub-level store, preserving cluster, tenant and model attribution after aggregation. The provider sees the whole estate; a tenant sees only its own footprint.
+
+| GitOps and multi-cluster management
+| Fans out model deployments and policy changes to the right sites. The grid then discovers new capacity and syncs it across sites, so a model becomes routable from any site without further manual steps.
+|===
+
+NOTE: Usage is recorded per tenant at the gateway and can be exported. Rating usage against price plans and producing invoices happens in your billing system, not in the grid.
+
+== Next
+
+* xref:04-request-flow.adoc[Request Flow] for how these components interact on a single request
+* xref:05-topology-diagram.adoc[Interactive Topology] to see the components placed on real clusters
+
+== References
+
+* link:{upstream-grid}[Praxis Grid - Architecture Overview^]
+* link:{upstream-praxis}[Praxis - Architecture Overview^]

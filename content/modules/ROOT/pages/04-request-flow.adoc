@@ -1,0 +1,173 @@
+= Request Flow
+
+This page follows a single inference request from a client to a model and back, across sites. It assumes the gateway has already accepted a routing overlay. If that part is unclear, read xref:03-components.adoc#_routing_overlays[Routing Overlays] first.
+
+== Two Pipelines, One Request
+
+Once an overlay is loaded, a remote-provider request runs through two gateway pipelines: one at the edge or consumer side, one at the provider side.
+
+----
+client request
+  -> AI Gateway consumer or edge gateway
+     -> request-format filter extracts model/tool metadata
+     -> intelligent_route selects a provider gateway from the loaded overlay
+  -> gateway-to-gateway mTLS
+  -> AI Gateway provider gateway
+     -> peer_identity_trust authenticates the calling peer
+     -> provider_route validates the selected candidate and local route
+     -> credential_inject adds provider auth for the final backend hop
+     -> load_balancer selects the authorized local backend
+  -> response returns to the client
+----
+
+When the consumer gateway itself owns the final backend connection, it runs the final-hop credential and load-balancing stages locally and there is no second pipeline. A remote provider credential always stays at the provider site and is never sent to the edge.
+
+== Step by Step
+
+=== 1. The User Gets a Key
+
+A tenant user signs in to the self-service portal through their identity provider, with no cluster access, and creates an API key. The key is bound to a subscription so that usage and quota are attributed correctly.
+
+What the platform stores is a hash of the key together with the identity and the subscription binding. The plaintext key is returned once.
+
+=== 2. The Client Sends a Request
+
+The user sends a standard OpenAI compatible request to the grid endpoint with their API key:
+
+[source,bash]
+----
+curl https://<grid-endpoint>/v1/chat/completions \
+  -H "Authorization: Bearer <api-key>" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "my-model", "messages": [{"role": "user", "content": "Hello"}]}'
+----
+
+Users get one URL for the whole grid. The provider can put DNS or edge routing in front of it so clients reach the nearest location, and any grid gateway can serve the request. This is the client-to-edge decision described in xref:02-architecture.adoc#_global_ingress_and_provider_boundaries[Global Ingress], and it belongs to the traffic-management layer rather than to the grid.
+
+=== 3. The Edge Gateway Authenticates and Parses
+
+The edge gateway authenticates the credential and enforces the governance policies before anything is routed:
+
+* *Identity.* The API key is validated against the stored hash, returning the user identity, groups and the subscription bound to that key. Unknown, revoked, expired or malformed keys are rejected with `401 Unauthorized`.
+* *Authorization.* Using the subscription from the key record, and not from a client header, the gateway checks whether the identity may use that subscription and whether the requested model is included in it. Failures return `403 Forbidden`.
+* *Quota.* The request is checked against the rate and token limits defined for the subscription. Exceeding them returns `429 Too Many Requests`.
+
+In parallel, a request-format filter extracts the metadata that routing needs. For Chat Completions style requests this is typically a generic body field extractor. For `/v1/responses`, a dedicated Responses API parser reads that shape and promotes the model for routing.
+
+=== 4. intelligent_route Selects a Provider
+
+`intelligent_route` matches the requested model, or tool, against the candidate set in the accepted overlay snapshot and picks the best candidate under its request-time rules.
+
+It does not recompute the control-plane score, and it does not call Kubernetes, the gossip layer or the operator. Everything it needs is already in memory.
+
+[NOTE]
+====
+The selected cluster is a load-balancer cluster name in the gateway configuration. An overlay can switch a request from `cluster-east` to `cluster-west` only if *both* clusters already exist in the gateway's `load_balancer` configuration. The overlay does not create endpoint definitions, it only selects among the ones that exist.
+====
+
+=== 5. The Authenticated Provider Hop
+
+The edge calls the selected provider gateway over gateway-to-gateway mTLS, carrying bounded provider-hop context. The candidate it selected and the serving revision travel in that context.
+
+=== 6. The Provider Gateway Re-Validates
+
+The provider gateway does not trust the hop. It:
+
+. Authenticates the calling peer certificate with `peer_identity_trust`
+. Validates the selected candidate and the local route with `provider_route`
+. Removes untrusted internal headers, including the edge-owned revision header
+. Writes its own provider-owned revision header for backend telemetry
+
+[IMPORTANT]
+====
+Revision headers carry telemetry, not authority. mTLS peer identity plus provider-local candidate, model and path policy are the authorization boundary. A request that reached a provider gateway is not yet an authorized request.
+====
+
+=== 7. Credential Injection and Backend Selection
+
+`credential_inject` reads the mounted Secret file in the gateway that is allowed to call the backend, and injects the outbound header. Then `load_balancer` selects an authorized local backend, and the request reaches the model.
+
+Serving happens on the provider's own GPU nodes, through the serving runtime at that site.
+
+=== 8. The Response Returns
+
+The response flows back through the provider gateway to the edge and on to the client. Usage counters are updated for the subscription, and the call is recorded against the tenant: model, tokens, and the cluster that served it.
+
+That record is what gives the provider a cross-tenant usage view, and the tenant a view of its own consumption against the subscription limits. It can be exported to a billing system; rating and invoicing happen there.
+
+== Credential Flow
+
+Credential handling follows one rule, and the rule is what keeps secrets from spreading across clusters:
+
+[quote]
+____
+The gateway or provider-side component that makes the final backend call owns and injects the backend credential.
+____
+
+[cols="1,1,1", options="header"]
+|===
+| Scenario | Credential lives with | Injected by
+
+| Local self-hosted backend
+| Local or provider site, if a credential is needed at all
+| Local or provider gateway
+
+| Remote grid site
+| Remote provider site
+| Remote provider gateway
+
+| Direct API fallback
+| Consumer or final-hop site
+| Consumer gateway
+
+| Cloud-managed backend behind a provider gateway
+| Provider site
+| Provider gateway
+
+| mTLS-only provider
+| No HTTP token involved
+| None
+|===
+
+The control plane validates the provider's Secret reference and projects only that reference into the overlay. It does not copy Secret values across clusters, and token bytes never appear in overlays, ConfigMaps, status or logs.
+
+== Failure Responses
+
+[cols="1,1,2", options="header"]
+|===
+| Code | Stage | Cause
+
+| `401`
+| Identity
+| Unknown, revoked, expired or malformed key
+
+| `403`
+| Authorization
+| Identity not entitled to the subscription, or model not included in it
+
+| `429`
+| Quota
+| Subscription rate or token limit exceeded
+|===
+
+Routing failures behave differently from these. Failover stays inside the candidate set authorized for that tenant, trust domain, compliance boundary, workload class and provider network. A provider that is merely reachable is not an eligible fallback.
+
+== What Is Not on the Hot Path
+
+Worth stating explicitly, because it is the property that makes the architecture scale:
+
+* The {agn-short} operator is not called during a request
+* Kubernetes is not queried during a request
+* The gossip and shared-state layers are not consulted during a request
+* No Kubernetes API credential is mounted in the gateway container
+
+A request reads an immutable in-memory snapshot that was validated and accepted earlier. If the control plane is down, already-accepted routing keeps serving.
+
+== Next
+
+* xref:05-topology-diagram.adoc[Interactive Topology] to see this flow against a concrete multi-cluster layout
+
+== References
+
+* link:{upstream-grid}[Praxis Grid - Architecture Overview^]
+* link:{upstream-praxis}[Praxis - Architecture Overview^]

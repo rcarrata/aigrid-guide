@@ -1,0 +1,26 @@
+name: modules
+title: AI Grid Guide
+version: main
+nav:
+  - modules/ROOT/nav.adoc
+
+asciidoc:
+  attributes:
+    experimental: true
+    page-pagination: true
+    source-highlighter: highlightjs
+    aigrid: "AI Grid"
+    agn: "AI Grid Network"
+    agn-short: "AGN"
+    gateway: "AI Gateway"
+    rhoai: "Red Hat OpenShift AI"
+    rhoai-short: "RHOAI"
+    ocp: "OpenShift Container Platform"
+    ocp-short: "OpenShift"
+    maas: "Models as a Service"
+    maas-short: "MaaS"
+    acm: "Red Hat Advanced Cluster Management"
+    acm-short: "ACM"
+    repo-url: "https://github.com/rcarrata/aigrid-guide"
+    upstream-grid: "https://praxis.fast/grid/v0.2.2/architecture/overview/"
+    upstream-praxis: "https://praxis.fast/praxis/v0.7.2/architecture/overview/"
