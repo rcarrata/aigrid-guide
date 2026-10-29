@@ -6,19 +6,7 @@ This page follows a single inference request from a client to a model and back, 
 
 Once an overlay is loaded, a remote-provider request runs through two gateway pipelines: one at the edge or consumer side, one at the provider side.
 
-----
-client request
-  -> AI Gateway consumer or edge gateway
-     -> request-format filter extracts model/tool metadata
-     -> intelligent_route selects a provider gateway from the loaded overlay
-  -> gateway-to-gateway mTLS
-  -> AI Gateway provider gateway
-     -> peer_identity_trust authenticates the calling peer
-     -> provider_route validates the selected candidate and local route
-     -> credential_inject adds provider auth for the final backend hop
-     -> load_balancer selects the authorized local backend
-  -> response returns to the client
-----
+image::request-pipelines.svg[The two gateway pipelines of one request,align="center",link=_images/request-pipelines.svg,window=_blank]
 
 When the consumer gateway itself owns the final backend connection, it runs the final-hop credential and load-balancing stages locally and there is no second pipeline. A remote provider credential always stays at the provider site and is never sent to the edge.
 

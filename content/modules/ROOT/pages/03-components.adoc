@@ -44,12 +44,7 @@ One operator per site. Its responsibilities:
 
 Each operator renders from its own local view of the world:
 
-----
-local Kubernetes custom resources
-+ local observed provider/site status
-+ remote provider/site state received from peers
-= this operator's local routing view
-----
+image::local-routing-view.svg[What each AGN operator renders from,align="center",link=_images/local-routing-view.svg,window=_blank]
 
 === Control-Plane Resources
 
@@ -85,15 +80,7 @@ An agent-to-agent resource type exists as schema direction, but no controller ru
 
 A backend does not become routable the moment it starts. It goes through stages:
 
-----
-Provider site declares an InferenceProvider
-  -> local AGN Operator validates placement, status and Secret references
-  -> local provider state is recorded as shared state
-  -> gossip carries that state to peer AGN Operators
-  -> peers merge the shared state into their local view
-  -> each operator applies access policy and scoring for its own gateways
-  -> each operator publishes a scoped, versioned overlay for its own gateways
-----
+image::provider-admission.svg[Stages a provider passes before it is routable,align="center",link=_images/provider-admission.svg,window=_blank]
 
 == State Distribution
 
@@ -176,17 +163,7 @@ NOTE: Neither revision header grants authority. mTLS peer identity and provider-
 
 Rendering a ConfigMap is not enough by itself. Kubernetes can project the new file into a pod, but the running gateway still has to consume it. The recommended handoff uses an overlay sync container:
 
-----
-AGN Operator
-  -> applies a scoped, content-addressed overlay ConfigMap
-Kubernetes API watch
-  -> overlay-sync receives the new resource version
-overlay-sync
-  -> validates size, schema, scope, revision and digest
-  -> atomically replaces the file in a shared emptyDir
-AI Gateway
-  -> observes the file change and hot-reloads the accepted snapshot
-----
+image::overlay-handoff.svg[Routing overlay handoff to the gateway,align="center",link=_images/overlay-handoff.svg,window=_blank]
 
 Gateway hot reload is already fast once the file changes. The sidecar exists because a directly projected ConfigMap is refreshed by the kubelet on an eventual schedule, and that delay has been observed to be long enough for a temporary routing preference to change and recover before the gateway saw either update. Watching the Kubernetes API removes that projected-volume delay from the normal path. The sidecar does not make the operator reconcile more frequently.
 

@@ -62,3 +62,4 @@ The architecture separates that into two halves, and most of this guide is about
 * link:{upstream-grid}[Praxis Grid - Architecture Overview^] (upstream of {aigrid})
 * link:{upstream-praxis}[Praxis - Architecture Overview^] (upstream proxy and filter runtime)
 * link:https://praxis.fast/[Praxis project documentation^], a CNCF Sandbox project under Apache 2.0
+* Diagram sources: every diagram is an Excalidraw scene, attached next to its SVG in the link:{repo-url}/tree/main/content/modules/ROOT/assets[repository assets^]
