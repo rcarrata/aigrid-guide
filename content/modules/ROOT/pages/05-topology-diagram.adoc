@@ -4,9 +4,7 @@ An interactive, clickable diagram of a multi-cluster {aigrid} deployment. Every 
 
 [NOTE]
 ====
-*Credit.* This diagram was created by *Mario Vazquez*, and it is reused here with his authorship credited. The only change from his original is the datacenter name, replaced by the fictional *Fed Aura Capital WONDR2 Datacenter* so the diagram can be published outside Red Hat. Everything else is his work: the layout, the component placement, the flows and the interactions.
-
-Thanks Mario for letting this guide use it.
+*Credit.* Diagram created by *Mario Vazquez*. The only change from his original is the datacenter name, now the fictional *Fed Aura Capital WONDR2 Datacenter*. Thanks Mario.
 ====
 
 [subs="attributes"]
